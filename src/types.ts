@@ -96,7 +96,119 @@ interface TransactionDetailsResponse {
       programId: string;
     }[];
   }[];
-  events: Record<string, unknown>;
+  events: {
+    swap: {
+      nativeInput: {
+        account: string;
+        amount: string;
+      } | null;
+      nativeOutput: {
+        account: string;
+        amount: string;
+      } | null;
+      tokenInputs: {
+        userAccount: string;
+        tokenAccount: string;
+        rawTokenAmount: {
+          tokenAmount: string;
+          decimals: number;
+        };
+        mint: string;
+      }[];
+      tokenOutputs: {
+        userAccount: string;
+        tokenAccount: string;
+        rawTokenAmount: {
+          tokenAmount: string;
+          decimals: number;
+        };
+        mint: string;
+      }[];
+      nativeFees: {
+        account: string;
+        amount: string;
+      }[];
+      tokenFees: {
+        userAccount: string;
+        tokenAccount: string;
+        rawTokenAmount: {
+          tokenAmount: string;
+          decimals: number;
+        };
+        mint: string;
+      }[];
+      innerSwaps: {
+        tokenInputs: {
+          fromTokenAccount: string;
+          toTokenAccount: string;
+          fromUserAccount: string;
+          toUserAccount: string;
+          tokenAmount: number;
+          mint: string;
+          tokenStandard: string;
+        }[];
+        tokenOutputs: {
+          fromTokenAccount: string;
+          toTokenAccount: string;
+          fromUserAccount: string;
+          toUserAccount: string;
+          tokenAmount: number;
+          mint: string;
+          tokenStandard: string;
+        }[];
+        tokenFees: {
+          userAccount: string;
+          tokenAccount: string;
+          rawTokenAmount: {
+            tokenAmount: string;
+            decimals: number;
+          };
+          mint: string;
+        }[];
+        nativeFees: {
+          account: string;
+          amount: string;
+        }[];
+        programInfo: {
+          source: string;
+          account: string;
+          programName: string;
+          instructionName: string;
+        };
+      }[];
+    };
+  };
+}
+
+export interface SwapEventDetailsResponse {
+  programInfo: {
+    source: string;
+    account: string;
+    programName: string;
+    instructionName: string;
+  };
+  tokenInputs: Array<{
+    fromTokenAccount: string;
+    toTokenAccount: string;
+    fromUserAccount: string;
+    toUserAccount: string;
+    tokenAmount: number;
+    mint: string;
+    tokenStandard: string;
+  }>;
+  tokenOutputs: Array<{
+    fromTokenAccount: string;
+    toTokenAccount: string;
+    fromUserAccount: string;
+    toUserAccount: string;
+    tokenAmount: number;
+    mint: string;
+    tokenStandard: string;
+  }>;
+  fee: number;
+  slot: number;
+  timestamp: number;
+  description: string;
 }
 
 // Update to reflect an array of transactions

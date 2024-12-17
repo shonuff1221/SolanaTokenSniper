@@ -19,6 +19,14 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 - Possibility to set own RPC nodes
 - Utils: Solana Wallet (keypair) creator
 
+### Update Log
+
+- 17-dec-2024-13: Added fetchAndSaveSwapDetails() in transactions.ts to track confirmed swaps.
+- 17-dec-2024-13: Updated test.ts
+- 17-dec-2024-13: Added JUP_HTTPS_PRICE_URI to .env.backup
+- 17-dec-2024-13: Web3.js updated from 1.95.8 to 1.98.0
+- 06-dec-2024-00: Initial Commit: Solana Sniper Bot
+
 ### Third Party documentation
 
 - [Helius RPC nodes](https://docs.helius.dev)

@@ -2,7 +2,12 @@ import WebSocket from "ws"; // Node.js websocket library
 import dotenv from "dotenv"; // zero-dependency module that loads environment variables from a .env
 import { WebSocketRequest } from "./types"; // Typescript Types for type safety
 import { config } from "./config"; // Configuration parameters for our bot
-import { fetchTransactionDetails, createSwapTransaction, getRugCheckConfirmed } from "./transactions";
+import {
+  fetchTransactionDetails,
+  createSwapTransaction,
+  getRugCheckConfirmed,
+  fetchAndSaveSwapDetails,
+} from "./transactions";
 
 // Load environment variables from the .env file
 dotenv.config();
@@ -33,7 +38,7 @@ async function websocketHandler(): Promise<void> {
   // Send subscription to the websocket once the connection is open
   ws.on("open", () => {
     if (ws) sendRequest(ws); // Send a request once the WebSocket is open
-    console.log("🔓 WebSocket is open and listening.");
+    console.log("\n🔓 WebSocket is open and listening.");
   });
 
   // Logic for the message event for the .on event listener
@@ -48,7 +53,11 @@ async function websocketHandler(): Promise<void> {
 
       // Validate `logs` is an array
       if (Array.isArray(logs)) {
-        const containsCreate = logs.some((log: string) => typeof log === "string" && log.includes("Program log: initialize2: InitializeInstruction2"));
+        const containsCreate = logs.some(
+          (log: string) =>
+            typeof log === "string" &&
+            log.includes("Program log: initialize2: InitializeInstruction2")
+        );
 
         if (!containsCreate || typeof signature !== "string") return;
 
@@ -84,30 +93,43 @@ async function websocketHandler(): Promise<void> {
         }
 
         // Handle ignored tokens
-        if (data.tokenMint.trim().toLowerCase().endsWith("pump") && config.liquidity_pool.ignore_pump_fun) {
+        if (
+          data.tokenMint.trim().toLowerCase().endsWith("pump") &&
+          config.liquidity_pool.ignore_pump_fun
+        ) {
           // Check if ignored
           console.log("🚫 Transaction skipped. Ignoring Pump.fun.");
           console.log("==========================================");
           return websocketHandler();
         }
 
-        console.log("💰 Token found: https://gmgn.ai/sol/token/" + data.tokenMint);
+        console.log(
+          "💰 Token found: https://gmgn.ai/sol/token/" + data.tokenMint
+        );
         const tx = await createSwapTransaction(data.solMint, data.tokenMint);
 
         // Abort and restart socket
         if (!tx) {
-          console.log("⛔Transaction aborted. No valid swap quote received.");
+          console.log(
+            "⛔Transaction aborted. No valid transaction id returned."
+          );
           return websocketHandler();
         }
 
-        if (tx) {
-          console.log("✅ Swap quote recieved.");
-          console.log("🚀 Swapping SOL for Token.");
-          console.log("Swap Transaction: ", tx);
-          console.log("==========================================");
-          //Start Websocket to listen for new tokens
-          return websocketHandler();
+        console.log("✅ Swap quote recieved.");
+        console.log("🚀 Swapping SOL for Token.");
+        console.log("Swap Transaction: ", "https://solscan.io/tx/" + tx);
+
+        // Fetch and store the transaction for tracking purposes
+        const saveConfirmation = await fetchAndSaveSwapDetails(tx);
+        if (!saveConfirmation) {
+          console.log(
+            "❌ Warning: Transaction not saved for tracking! Track Manually!"
+          );
         }
+
+        //Start Websocket to listen for new tokens
+        return websocketHandler();
       }
     } catch (error) {
       console.error("Error parsing JSON or processing data:", error);
