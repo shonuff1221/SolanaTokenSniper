@@ -21,6 +21,10 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 
 ### Update Log
 
+- 18-dec-2024-22: Added tracker functionality in "src\tracker\index.ts".
+- 18-dec-2024-22: Updated fetchAndSaveSwapDetails() in transactions.ts to use sqlite3.
+- 18-dec-2024-22: Updated config.ts: Addded sell parameters
+- 18-dec-2024-22: Added packages: luxon, sqlite, sqlite3
 - 17-dec-2024-13: Added fetchAndSaveSwapDetails() in transactions.ts to track confirmed swaps.
 - 17-dec-2024-13: Updated test.ts
 - 17-dec-2024-13: Added JUP_HTTPS_PRICE_URI to .env.backup
