@@ -6,6 +6,7 @@ import { open } from "sqlite";
 import { createTableHoldings } from "./db";
 import { HoldingRecord } from "../types";
 import { DateTime } from "luxon";
+import { createSellTransaction } from "../transactions";
 
 // Load environment variables from the .env file
 dotenv.config();
@@ -38,70 +39,90 @@ async function main() {
 
     // Get all our current holdings
     const holdings = await db.all("SELECT * FROM holdings");
+    if (holdings.length !== 0) {
+      // Get all token ids
+      const tokenValues = holdings.map((holding) => holding.Token).join(",");
 
-    // Get all token ids
-    const tokenValues = holdings.map((holding) => holding.Token).join(",");
+      // @TODO, add more sources for current prices. Now our price is the current price based on the Jupiter Last Swap (sell/buy) price
 
-    // Get latest tokens Price
-    const solMint = config.liquidity_pool.wsol_pc_mint;
-    const priceResponse = await axios.get<any>(priceUrl, {
-      params: {
-        ids: tokenValues + "," + solMint,
-        showExtraInfo: true,
-      },
-      timeout: config.tx.get_timeout,
-    });
+      // Get latest tokens Price
+      const solMint = config.liquidity_pool.wsol_pc_mint;
+      const priceResponse = await axios.get<any>(priceUrl, {
+        params: {
+          ids: tokenValues + "," + solMint,
+          showExtraInfo: true,
+        },
+        timeout: config.tx.get_timeout,
+      });
 
-    // Verify if we received the latest prices
-    const currentPrices = priceResponse.data.data;
-    if (!currentPrices) {
-      console.log("⛔ Latest price could not be fetched. Trying again...");
-      return;
-    }
-
-    // Loop trough all our current holdings
-    holdings.forEach((row: HoldingRecord) => {
-      const token = row.Token;
-      const tokenName = row.TokenName === "N/A" ? token : row.TokenName;
-      const tokenTime = row.Time;
-      const tokenBalance = row.Balance;
-      const tokenSolPaid = row.SolPaid;
-      const tokenSolFeePaid = row.SolFeePaid;
-      const tokenSolPaidUSDC = row.SolPaidUSDC;
-      const tokenSolFeePaidUSDC = row.SolFeePaidUSDC;
-      const tokenPerTokenPaidUSDC = row.PerTokenPaidUSDC;
-      const tokenSlot = row.Slot;
-      const tokenProgram = row.Program;
-
-      // Conver Trade Time
-      const centralEuropenTime = DateTime.fromMillis(tokenTime).toLocal();
-      const hrTradeTime = centralEuropenTime.toFormat("HH:mm:ss");
-
-      // Get current price
-      const tokenCurrentPrice = currentPrices[token]?.extraInfo?.lastSwappedPrice?.lastJupiterSellPrice;
-
-      // Calculate PnL and profit/loss
-      const unrealizedPnLUSDC = (tokenCurrentPrice - tokenPerTokenPaidUSDC) * tokenBalance - tokenSolFeePaidUSDC;
-      const unrealizedPnLPercentage = (unrealizedPnLUSDC / (tokenPerTokenPaidUSDC * tokenBalance)) * 100;
-      const iconPnl = unrealizedPnLUSDC > 0 ? "🟢" : "🔴";
-
-      // Check SL/TP
-      if (config.sell.auto_sell && config.sell.auto_sell === true) {
-        if (unrealizedPnLPercentage >= config.sell.take_profit_percent) {
-          // @TODO: SELL
-        }
-        if (unrealizedPnLPercentage <= -config.sell.stop_loss_percent) {
-          // @TODO: SELL
-        }
+      // Verify if we received the latest prices
+      const currentPrices = priceResponse.data.data;
+      if (!currentPrices) {
+        console.log("⛔ Latest price could not be fetched. Trying again...");
+        return;
       }
 
-      // Get the current price
-      saveLog(
-        `${hrTradeTime} Buy ${tokenBalance} ${tokenName} for $${tokenSolPaidUSDC.toFixed(2)}. ${iconPnl} Unrealized PnL: $${unrealizedPnLUSDC.toFixed(
-          2
-        )} (${unrealizedPnLPercentage.toFixed(2)}%)`
+      // Loop trough all our current holdings
+      await Promise.all(
+        holdings.map(async (row) => {
+          const holding: HoldingRecord = row;
+          const token = holding.Token;
+          const tokenName = holding.TokenName === "N/A" ? token : holding.TokenName;
+          const tokenTime = holding.Time;
+          const tokenBalance = holding.Balance;
+          const tokenSolPaid = holding.SolPaid;
+          const tokenSolFeePaid = holding.SolFeePaid;
+          const tokenSolPaidUSDC = holding.SolPaidUSDC;
+          const tokenSolFeePaidUSDC = holding.SolFeePaidUSDC;
+          const tokenPerTokenPaidUSDC = holding.PerTokenPaidUSDC;
+          const tokenSlot = holding.Slot;
+          const tokenProgram = holding.Program;
+
+          // Conver Trade Time
+          const centralEuropenTime = DateTime.fromMillis(tokenTime).toLocal();
+          const hrTradeTime = centralEuropenTime.toFormat("HH:mm:ss");
+
+          // Get current price
+          const tokenCurrentPrice = currentPrices[token]?.extraInfo?.lastSwappedPrice?.lastJupiterSellPrice;
+
+          // Calculate PnL and profit/loss
+          const unrealizedPnLUSDC = (tokenCurrentPrice - tokenPerTokenPaidUSDC) * tokenBalance - tokenSolFeePaidUSDC;
+          const unrealizedPnLPercentage = (unrealizedPnLUSDC / (tokenPerTokenPaidUSDC * tokenBalance)) * 100;
+          const iconPnl = unrealizedPnLUSDC > 0 ? "🟢" : "🔴";
+
+          // Check SL/TP
+          let sltpMessage = "";
+          if (config.sell.auto_sell && config.sell.auto_sell === true) {
+            const amountIn = tokenBalance.toString().replace(".", "");
+            if (unrealizedPnLPercentage >= config.sell.take_profit_percent) {
+              const tx = await createSellTransaction(config.liquidity_pool.wsol_pc_mint, token, amountIn);
+              if (!tx) {
+                sltpMessage = "⛔ Could not take profit. Trying again in 5 seconds.";
+              }
+              if (tx) {
+                sltpMessage = "Took Profit: " + tx;
+              }
+            }
+            if (unrealizedPnLPercentage <= -config.sell.stop_loss_percent) {
+              const tx = await createSellTransaction(config.liquidity_pool.wsol_pc_mint, token, amountIn);
+              if (!tx) {
+                sltpMessage = "⛔ Could not sell stop loss. Trying again in 5 seconds.";
+              }
+              if (tx) {
+                sltpMessage = "Stop Loss triggered: " + tx;
+              }
+            }
+          }
+
+          // Get the current price
+          saveLog(
+            `${hrTradeTime} Buy ${tokenBalance} ${tokenName} for $${tokenSolPaidUSDC.toFixed(2)}. ${iconPnl} Unrealized PnL: $${unrealizedPnLUSDC.toFixed(
+              2
+            )} (${unrealizedPnLPercentage.toFixed(2)}%) ${sltpMessage}`
+          );
+        })
       );
-    });
+    }
 
     // Output updated holdings
     console.clear();
@@ -114,6 +135,7 @@ async function main() {
     }
 
     // Close the database connection when done
+    console.log("Last Update: ", new Date().toISOString());
     await db.close();
   }
 

@@ -32,6 +32,9 @@ async function websocketHandler(): Promise<void> {
   let transactionOngoing = false;
   if (!init) console.clear();
 
+  // @TODO, test with hosting our app on a Cloud instance closer to the RPC nodes physical location for minimal latency
+  // @TODO, test with different RPC and API nodes (free and paid) from quicknode and shyft to test speed
+
   // Send subscription to the websocket once the connection is open
   ws.on("open", () => {
     if (ws) sendRequest(ws); // Send a request once the WebSocket is open

@@ -14,7 +14,7 @@ import {
   HoldingRecord,
   HoldingMetadata,
 } from "./types";
-import { insertHolding } from "./tracker/db";
+import { insertHolding, removeHolding } from "./tracker/db";
 
 // Load environment variables from the .env file
 dotenv.config();
@@ -93,27 +93,75 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
   const swapUrl = process.env.JUP_HTTPS_SWAP_URI || "";
   const rpcUrl = process.env.HELIUS_HTTPS_URI || "";
   const myWallet = new Wallet(Keypair.fromSecretKey(bs58.decode(process.env.PRIV_KEY_WALLET || "")));
+  let quoteResponseData: QuoteResponse | null = null;
+  let serializedQuoteResponseData: SerializedQuoteResponse | null = null;
 
+  // Get Swap Quote
+  let retryCount = 0;
+  while (retryCount < config.swap.token_not_tradable_400_error_retries) {
+    try {
+      // Request a quote in order to swap SOL for new token
+      const quoteResponse = await axios.get<QuoteResponse>(quoteUrl, {
+        params: {
+          inputMint: solMint,
+          outputMint: tokenMint,
+          amount: config.swap.amount,
+          slippageBps: config.swap.slippageBps,
+        },
+        timeout: config.tx.get_timeout,
+      });
+
+      if (!quoteResponse.data) return null;
+
+      if (config.swap.verbose_log && config.swap.verbose_log === true) {
+        console.log("\nVerbose log:");
+        console.log(quoteResponse.data);
+      }
+
+      quoteResponseData = quoteResponse.data; // Store the successful response
+      break;
+    } catch (error: any) {
+      // Retry when error is TOKEN_NOT_TRADABLE
+      if (error.response && error.response.status === 400) {
+        const errorData = error.response.data;
+        if (errorData.errorCode === "TOKEN_NOT_TRADABLE") {
+          retryCount++;
+          await new Promise((resolve) => setTimeout(resolve, config.swap.token_not_tradable_400_error_delay));
+          continue; // Retry
+        }
+      }
+
+      // Throw error (null) when error is not TOKEN_NOT_TRADABLE
+      console.error("Error while requesting a new swap quote:", error.message);
+      if (config.swap.verbose_log && config.swap.verbose_log === true) {
+        console.log("Verbose Error Message:");
+        if (error.response) {
+          // Server responded with a status other than 2xx
+          console.error("Error Status:", error.response.status);
+          console.error("Error Status Text:", error.response.statusText);
+          console.error("Error Data:", error.response.data); // API error message
+          console.error("Error Headers:", error.response.headers);
+        } else if (error.request) {
+          // Request was made but no response was received
+          console.error("No Response:", error.request);
+        } else {
+          // Other errors
+          console.error("Error Message:", error.message);
+        }
+      }
+      return null;
+    }
+  }
+
+  // Serialize the quote into a swap transaction that can be submitted on chain
   try {
-    // Request a quote in order to swap SOL for new token
-    const quoteResponse = await axios.get<QuoteResponse>(quoteUrl, {
-      params: {
-        inputMint: solMint,
-        outputMint: tokenMint,
-        amount: config.swap.amount,
-        slippageBps: config.swap.slippageBps,
-      },
-      timeout: config.tx.get_timeout,
-    });
+    if (!quoteResponseData) return null;
 
-    if (!quoteResponse.data) return null;
-
-    // Serialize the quote into a swap transaction that can be submitted on chain
-    const swapTransaction = await axios.post<SerializedQuoteResponse>(
+    const swapResponse = await axios.post<SerializedQuoteResponse>(
       swapUrl,
       JSON.stringify({
         // quoteResponse from /quote api
-        quoteResponse: quoteResponse.data,
+        quoteResponse: quoteResponseData,
         // user public key to be used for the swap
         userPublicKey: myWallet.publicKey.toString(),
         // auto wrap and unwrap SOL. default is true
@@ -137,18 +185,45 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
         timeout: config.tx.get_timeout,
       }
     );
-    if (!swapTransaction.data) return null;
+    if (!swapResponse.data) return null;
 
-    // deserialize the transaction
-    const swapTransactionBuf = Buffer.from(swapTransaction.data.swapTransaction, "base64");
+    if (config.swap.verbose_log && config.swap.verbose_log === true) {
+      console.log(swapResponse.data);
+    }
+
+    serializedQuoteResponseData = swapResponse.data; // Store the successful response
+  } catch (error: any) {
+    console.error("Error while sending the swap quote:", error.message);
+    if (config.swap.verbose_log && config.swap.verbose_log === true) {
+      console.log("Verbose Error Message:");
+      if (error.response) {
+        // Server responded with a status other than 2xx
+        console.error("Error Status:", error.response.status);
+        console.error("Error Status Text:", error.response.statusText);
+        console.error("Error Data:", error.response.data); // API error message
+        console.error("Error Headers:", error.response.headers);
+      } else if (error.request) {
+        // Request was made but no response was received
+        console.error("No Response:", error.request);
+      } else {
+        // Other errors
+        console.error("Error Message:", error.message);
+      }
+    }
+    return null;
+  }
+
+  // deserialize, sign and send the transaction
+  try {
+    if (!serializedQuoteResponseData) return null;
+    const swapTransactionBuf = Buffer.from(serializedQuoteResponseData.swapTransaction, "base64");
     var transaction = VersionedTransaction.deserialize(swapTransactionBuf);
 
     // sign the transaction
     transaction.sign([myWallet.payer]);
 
-    // get the latest block hash
+    // Create connection with RPC url
     const connection = new Connection(rpcUrl);
-    const latestBlockHash = await connection.getLatestBlockhash();
 
     // Execute the transaction
     const rawTransaction = transaction.serialize();
@@ -163,6 +238,7 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
     }
 
     // Fetch the current status of a transaction signature (processed, confirmed, finalized).
+    const latestBlockHash = await connection.getLatestBlockhash();
     const conf = await connection.confirmTransaction({
       blockhash: latestBlockHash.blockhash,
       lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
@@ -176,7 +252,23 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
 
     return txid;
   } catch (error: any) {
-    console.error("Error while creating and submitting transaction:", error.message);
+    console.error("Error while signing and sending the transaction:", error.message);
+    if (config.swap.verbose_log && config.swap.verbose_log === true) {
+      console.log("Verbose Error Message:");
+      if (error.response) {
+        // Server responded with a status other than 2xx
+        console.error("Error Status:", error.response.status);
+        console.error("Error Status Text:", error.response.statusText);
+        console.error("Error Data:", error.response.data); // API error message
+        console.error("Error Headers:", error.response.headers);
+      } else if (error.request) {
+        // Request was made but no response was received
+        console.error("No Response:", error.request);
+      } else {
+        // Other errors
+        console.error("Error Message:", error.message);
+      }
+    }
     return null;
   }
 }
@@ -188,12 +280,22 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
 
   if (!rugResponse.data) return false;
 
+  if (config.rug_check.verbose_log && config.rug_check.verbose_log === true) {
+    console.log(rugResponse.data);
+  }
+
   // Check if a single user holds more than 30 %
   for (const risk of rugResponse.data.risks) {
     if (risk.name === "Single holder ownership") {
       const numericValue = parseFloat(risk.value.replace("%", "")); // Convert percentage string to a number
       if (numericValue > config.rug_check.single_holder_ownership) {
         return false; // Return false immediately if value exceeds 30%
+      }
+    }
+    if (risk.name === "Low Liquidity") {
+      const numericValue = parseFloat(risk.value.replace("%", ""));
+      if (numericValue > config.rug_check.low_liquidity) {
+        return false; // Return false immediately if value is smaller than 10000
       }
     }
   }
@@ -292,10 +394,10 @@ export async function fetchAndSaveSwapDetails(tx: string): Promise<boolean> {
       SolFeePaidUSDC: solFeePaidUsdc,
       PerTokenPaidUSDC: perTokenUsdcPrice,
       Slot: swapTransactionData.slot,
-      Program: swapTransactionData.programInfo.source,
+      Program: swapTransactionData.programInfo ? swapTransactionData.programInfo.source : "N/A",
     };
 
-    insertHolding(newHolding).catch((err) => {
+    await insertHolding(newHolding).catch((err) => {
       console.log("⛔ Database Error: " + err);
       return false;
     });
@@ -314,6 +416,9 @@ export async function createSellTransaction(solMint: string, tokenMint: string, 
   const myWallet = new Wallet(Keypair.fromSecretKey(bs58.decode(process.env.PRIV_KEY_WALLET || "")));
 
   try {
+    // @TODO: Verify if the user still holds this token to make sure we can sell it.
+    // https://docs.helius.dev/compression-and-das-api/digital-asset-standard-das-api/get-assets-by-owner
+
     // Request a quote in order to swap SOL for new token
     const quoteResponse = await axios.get<QuoteResponse>(quoteUrl, {
       params: {
@@ -392,6 +497,11 @@ export async function createSellTransaction(solMint: string, tokenMint: string, 
     if (conf.value.err || conf.value.err !== null) {
       return null;
     }
+
+    // Delete holding
+    removeHolding(tokenMint).catch((err) => {
+      console.log("⛔ Database Error: " + err);
+    });
 
     return txid;
   } catch (error: any) {

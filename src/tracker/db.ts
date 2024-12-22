@@ -53,3 +53,21 @@ export async function insertHolding(holding: HoldingRecord) {
     await db.close();
   }
 }
+
+export async function removeHolding(tokenMint: string) {
+  const db = await open({
+    filename: config.swap.db_name_tracker_holdings,
+    driver: sqlite3.Database,
+  });
+
+  // Proceed with deleting the holding
+  await db.run(
+    `
+    DELETE FROM holdings
+    WHERE Token = ?;
+    `,
+    [tokenMint]
+  );
+
+  await db.close();
+}

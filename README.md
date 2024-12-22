@@ -1,6 +1,12 @@
 This repository contains all the code "as is", following the "Solana Sniper Trading Bot in TypeScript" on YouTube provided by [DigitalBenjamins](https://x.com/digbenjamins).
 
+Part 1: Snipe New Tokens from Raydium LP
+
 [![Solana Sniper Trading Bot in TypeScript](https://img.youtube.com/vi/vsMbnsdHOIQ/0.jpg)](https://www.youtube.com/watch?v=vsMbnsdHOIQ)
+
+Part 2: Track and sell tokens (SL/TP)
+
+[![Solana Sniper Trading Bot in TypeScript](https://img.youtube.com/vi/4CdXLywg2O8/0.jpg)](https://www.youtube.com/watch?v=4CdXLywg2O8)
 
 You can find the YouTube tutorial here: https://www.youtube.com/watch?v=vsMbnsdHOIQ
 
@@ -8,7 +14,7 @@ You can find the YouTube tutorial here: https://www.youtube.com/watch?v=vsMbnsdH
 
 The Solana Token Sniper is a Node.js project built with TypeScript, designed to automate the buying and selling of tokens on the Solana blockchain. This script is configured to detect the creation of new liquidity pools and execute token purchases automatically.
 
-With customizable parameters, you can tailor the strategy to suit your needs. The primary goal of this project is to educate users about the essential components required to develop a simple token sniper, offering insights into its functionality and implementation.
+With customizable parameters, you can tailor the strategy to suit your needs. The primary goal of this project is to educate users about the essential components required to develop a simple token sniper, offering insights into its functionality and implementation!
 
 ### Features
 
@@ -17,10 +23,15 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 - Possibility to skip pump.fun tokens
 - Auto-buy with parameters for amount, slippage and priority
 - Possibility to set own RPC nodes
+- Track and store tokens in local database
+- Auto-sell feature using Stop Loss and Take Profit
 - Utils: Solana Wallet (keypair) creator
 
 ### Update Log
 
+- 21-dec-2024:19: Added createSellTransaction() in transactions.ts to sell SL and TP tokens.
+- 21-dec-2024:19: Added Retry logic for Swap Quote requests
+- 21-dec-2024:19: Added Verbose loging option
 - 18-dec-2024-22: Added tracker functionality in "src\tracker\index.ts".
 - 18-dec-2024-22: Updated fetchAndSaveSwapDetails() in transactions.ts to use sqlite3.
 - 18-dec-2024-22: Updated config.ts: Addded sell parameters
