@@ -27,8 +27,14 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 - Auto-sell feature using Stop Loss and Take Profit
 - Utils: Solana Wallet (keypair) creator
 
+### Contributors
+
+[mrevolverz](https://github.com/mrevolverz)
+
 ### Update Log
 
+- 30-dec-2024:21: Added patch-package dev dependency to apply patches/tr46+0.0.3.patch
+- 30-dec-2024:21: Added punycode.js package to resolve [issue](https://github.com/mathiasbynens/punycode.js/issues/137).
 - 21-dec-2024:19: Added createSellTransaction() in transactions.ts to sell SL and TP tokens.
 - 21-dec-2024:19: Added Retry logic for Swap Quote requests
 - 21-dec-2024:19: Added Verbose loging option

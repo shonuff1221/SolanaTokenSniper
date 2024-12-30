@@ -1,6 +1,6 @@
 export const config = {
   liquidity_pool: {
-    ignore_pump_fun: false,
+    ignore_pump_fun: true,
     radiyum_program_id: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
     wsol_pc_mint: "So11111111111111111111111111111111111111112",
   },
@@ -31,7 +31,7 @@ export const config = {
   rug_check: {
     verbose_log: false,
     single_holder_ownership: 30,
-    low_liquidity: 1000,
-    not_allowed: ["Freeze Authority still enabled", "Copycat token"], //"Large Amount of LP Unlocked", "Low amount of LP Providers"
+    low_liquidity: 8000,
+    not_allowed: ["Freeze Authority still enabled", "Copycat token", "Large Amount of LP Unlocked", "Low amount of LP Providers"],
   },
 };
