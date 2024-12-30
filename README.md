@@ -31,6 +31,15 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 
 [mrevolverz](https://github.com/mrevolverz)
 
+### Prerequisites, Installation and Usage Instructions
+
+1. Ensure [Node.js](https://nodejs.org/en) is installed on your computer.
+2. Clone the repository to your local machine.
+3. Navigate to the project folder and run the following command to install all dependencies: "npm i"
+4. To start the sniper, run: "npm run dev"
+5. To start the sniper, run: "npm run tracker"
+6. Optional: To start the sniper and tracker after being compiled, run: "npm run start" and "npm run start:tracker"
+
 ### Update Log
 
 - 30-dec-2024:21: Added patch-package dev dependency to apply patches/tr46+0.0.3.patch

@@ -6,6 +6,7 @@
     "postinstall": "patch-package",
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:tracker": "node dist/tracker/index.js",
     "dev": "ts-node src/index.ts",
     "tracker": "ts-node src/tracker/index.ts",
     "test": "ts-node src/test.ts",
