@@ -42,6 +42,15 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 
 ### Update Log
 
+- 02-dec-2024:16: Change Metadata RCP request to local database lookup
+- 02-dec-2024:16: Expanded Rug check
+- 02-dec-2024:16: Added new token tracker for rug check duplicates functionality and meta data
+- 02-dec-2024:16: Added Simulation Mode to skip the actual swap
+- 02-dec-2024:16: Added logsUnsubscribe before subscribing to RPC logsSubscribe method
+- 02-dec-2024:16: Improved fetchTransactionDetails() error handling
+- 02-dec-2024:16: Updated fetchTransactionDetails() to use retry based on count instead of time
+- 02-dec-2024:16: Process transaction asynchronously and add max concurrent transactions
+- 02-dec-2024:16: Revert back to native punycode as libraries are identical.
 - 30-dec-2024:21: Added patch-package dev dependency to apply patches/tr46+0.0.3.patch
 - 30-dec-2024:21: Added punycode.js package to resolve [issue](https://github.com/mathiasbynens/punycode.js/issues/137).
 - 21-dec-2024:19: Added createSellTransaction() in transactions.ts to sell SL and TP tokens.
@@ -72,3 +81,5 @@ The course videos accompanying this project are provided free of charge and are 
 You are solely responsible for your own financial decisions. Before making any trades or investments, it is strongly recommended that you consult with a qualified financial professional.
 
 By using this software, you acknowledge that the creators and contributors of this project shall not be held liable for any financial losses, damages, or other consequences resulting from its use. Use the software at your own risk.
+
+The software must not be used to engage in any form of market manipulation, fraud, illegal activities, or unethical behavior. The creators of this project do not endorse or support malicious use cases, such as front-running, exploiting contracts, or harming other users. Users are expected to adhere to ethical trading practices and comply with applicable laws and regulations.

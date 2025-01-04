@@ -1,16 +1,21 @@
 export const config = {
+  settings: {
+    simulation_mode: false, // If true, the sniper will not swap (buy) the token but just display.
+  },
   liquidity_pool: {
-    ignore_pump_fun: true,
     radiyum_program_id: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
     wsol_pc_mint: "So11111111111111111111111111111111111111112",
   },
   tx: {
-    get_retry_interval: 750, // Amount of seconds to trigger transaction details request
-    get_retry_timeout: 20000, // Amount of seconds to keep trying to fetch transaction details
+    fetch_tx_max_retries: 10,
+    fetch_tx_initial_delay: 3000,
     get_timeout: 10000, // Timeout for API requests
+    concurrent_transactions: 1, // Number of simultaneous transactions
+    initial_delay: 1000, // Initial delay before first buy (1 second)
+    retry_delay: 500, // Delay between retries (0.5 seconds)
   },
   swap: {
-    verbose_log: false,
+    verbose_log: true,
     prio_fee_max_lamports: 1000000, // 0.001 SOL
     prio_level: "veryHigh", // If you want to land transaction fast, set this to use `veryHigh`. You will pay on average higher priority fee.
     amount: "10000000", //0.01 SOL
@@ -29,9 +34,33 @@ export const config = {
     track_public_wallet: "", // If set an additional log line will be shown with a link to track your wallet
   },
   rug_check: {
-    verbose_log: false,
-    single_holder_ownership: 30,
-    low_liquidity: 8000,
-    not_allowed: ["Freeze Authority still enabled", "Copycat token", "Large Amount of LP Unlocked", "Low amount of LP Providers"],
+    verbose_log: true,
+    // Dangerous
+    allow_mint_authority: false, // The mint authority is the address that has permission to mint (create) new tokens. Strongly Advised to set to false.
+    allow_not_initialized: false, // This indicates whether the token account is properly set up on the blockchain. Strongly Advised to set to false
+    allow_freeze_authority: false, // The freeze authority is the address that can freeze token transfers, effectively locking up funds. Strongly Advised to set to false
+    allow_rugged: false,
+    // Critical
+    allow_mutable: false,
+    block_returning_token_names: false,
+    block_returning_token_creators: false,
+    block_symbols: ["BTC16", "BTC17"],
+    block_names: ["BTC16", "BTC17"],
+    allow_insider_topholders: false, // Allow inseder accounts to be part of the topholders
+    max_alowed_pct_topholders: 90, // Max allowed percentage an individual topholder might hold
+    // Warning
+    min_total_markets: 1,
+    min_total_lp_providers: 1,
+    min_total_market_Liquidity: 1000,
+    // Misc
+    ignore_pump_fun: false,
+    max_score: 0, // Set to 0 to ignore
+    legacy_not_allowed: [
+      "Freeze Authority still enabled",
+      "Large Amount of LP Unlocked",
+      "High holder concentration",
+      "Copycat token",
+      "Low amount of LP Providers",
+    ],
   },
 };

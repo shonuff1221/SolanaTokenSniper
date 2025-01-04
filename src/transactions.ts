@@ -6,86 +6,128 @@ import dotenv from "dotenv";
 import { config } from "./config";
 import {
   TransactionDetailsResponseArray,
-  DisplayDataItem,
+  MintsDataReponse,
   QuoteResponse,
   SerializedQuoteResponse,
-  RugResponse,
   SwapEventDetailsResponse,
   HoldingRecord,
-  HoldingMetadata,
+  RugResponseExtended,
+  NewTokenRecord,
 } from "./types";
-import { insertHolding, removeHolding } from "./tracker/db";
+import { insertHolding, insertNewToken, removeHolding, selectTokenByMint, selectTokenByNameAndCreator } from "./tracker/db";
 
 // Load environment variables from the .env file
 dotenv.config();
 
-export async function fetchTransactionDetails(signature: string): Promise<DisplayDataItem | null> {
-  const API_URL = process.env.HELIUS_HTTPS_URI_TX || "";
-  const startTime = Date.now();
+export async function fetchTransactionDetails(signature: string): Promise<MintsDataReponse | null> {
+  // Set function constants
+  const txUrl = process.env.HELIUS_HTTPS_URI_TX || "";
+  const maxRetries = config.tx.fetch_tx_max_retries;
+  let retryCount = 0;
 
-  while (Date.now() - startTime < config.tx.get_retry_timeout) {
+  // Add longer initial delay to allow transaction to be processed
+  console.log("Waiting " + config.tx.fetch_tx_initial_delay / 1000 + " seconds for transaction to be confirmed...");
+  await new Promise((resolve) => setTimeout(resolve, config.tx.fetch_tx_initial_delay));
+
+  while (retryCount < maxRetries) {
     try {
+      // Output logs
+      console.log(`Attempt ${retryCount + 1} of ${maxRetries} to fetch transaction details...`);
+
       const response = await axios.post<any>(
-        API_URL,
-        { transactions: [signature] },
+        txUrl,
+        {
+          transactions: [signature],
+          commitment: "finalized",
+          encoding: "jsonParsed",
+        },
         {
           headers: {
             "Content-Type": "application/json",
           },
-          timeout: 10000, // Timeout for each request
+          timeout: config.tx.get_timeout,
         }
       );
 
-      if (response.data && response.data.length > 0) {
-        // Access the `data` property which contains the array of transactions
-        const transactions: TransactionDetailsResponseArray = response.data;
-
-        // Safely access the first transaction's instructions
-        const instructions = transactions[0]?.instructions;
-
-        if (!instructions || instructions.length === 0) {
-          console.log("no instructions found. Skipping LP.");
-          return null;
-        }
-
-        const instruction = instructions.find((ix) => ix.programId === config.liquidity_pool.radiyum_program_id);
-
-        if (!instruction || !instruction.accounts) {
-          console.log("no instruction found. Skipping LP.");
-          return null;
-        }
-
-        // Set new token and SOL mint
-        const accounts = instruction.accounts;
-        const accountOne = accounts[8];
-        const accountTwo = accounts[9];
-        let solTokenAccount = "";
-        let newTokenAccount = "";
-        if (accountOne === config.liquidity_pool.wsol_pc_mint) {
-          solTokenAccount = accountOne;
-          newTokenAccount = accountTwo;
-        } else {
-          solTokenAccount = accountTwo;
-          newTokenAccount = accountOne;
-        }
-
-        const displayData: DisplayDataItem = {
-          tokenMint: newTokenAccount,
-          solMint: solTokenAccount,
-        };
-
-        return displayData;
+      // Verify if a response was received
+      if (!response.data) {
+        throw new Error("No response data received");
       }
-    } catch (error: any) {
-      console.error("Error during request:", error.message);
-      return null;
-    }
 
-    await new Promise((resolve) => setTimeout(resolve, config.tx.get_retry_interval)); // delay
+      // Verify if the response was in the correct format and not empty
+      if (!Array.isArray(response.data) || response.data.length === 0) {
+        throw new Error("Response data array is empty");
+      }
+
+      // Access the `data` property which contains the array of transactions
+      const transactions: TransactionDetailsResponseArray = response.data;
+
+      // Verify if transaction details were found
+      if (!transactions[0]) {
+        throw new Error("Transaction not found");
+      }
+
+      // Access the `instructions` property which contains account instructions
+      const instructions = transactions[0].instructions;
+      if (!instructions || !Array.isArray(instructions) || instructions.length === 0) {
+        throw new Error("No instructions found in transaction");
+      }
+
+      // Verify and find the instructions for the correct market maker id
+      const instruction = instructions.find((ix) => ix.programId === config.liquidity_pool.radiyum_program_id);
+      if (!instruction || !instruction.accounts) {
+        throw new Error("No market maker instruction found");
+      }
+      if (!Array.isArray(instruction.accounts) || instruction.accounts.length < 10) {
+        throw new Error("Invalid accounts array in instruction");
+      }
+
+      // Store quote and token mints
+      const accountOne = instruction.accounts[8];
+      const accountTwo = instruction.accounts[9];
+
+      // Verify if we received both quote and token mints
+      if (!accountOne || !accountTwo) {
+        throw new Error("Required accounts not found");
+      }
+
+      // Set new token and SOL mint
+      let solTokenAccount = "";
+      let newTokenAccount = "";
+      if (accountOne === config.liquidity_pool.wsol_pc_mint) {
+        solTokenAccount = accountOne;
+        newTokenAccount = accountTwo;
+      } else {
+        solTokenAccount = accountTwo;
+        newTokenAccount = accountOne;
+      }
+
+      // Output logs
+      console.log("Successfully fetched transaction details!");
+      console.log(`SOL Token Account: ${solTokenAccount}`);
+      console.log(`New Token Account: ${newTokenAccount}`);
+
+      const displayData: MintsDataReponse = {
+        tokenMint: newTokenAccount,
+        solMint: solTokenAccount,
+      };
+
+      return displayData;
+    } catch (error: any) {
+      console.log(`Attempt ${retryCount + 1} failed: ${error.message}`);
+
+      retryCount++;
+
+      if (retryCount < maxRetries) {
+        const delay = Math.min(4000 * Math.pow(1.5, retryCount), 15000);
+        console.log(`Waiting ${delay / 1000} seconds before next attempt...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
   }
 
-  console.log("Timeout exceeded. No data returned.");
-  return null; // Return null after timeout
+  console.log("All attempts to fetch transaction details failed");
+  return null;
 }
 
 export async function createSwapTransaction(solMint: string, tokenMint: string): Promise<string | null> {
@@ -274,7 +316,7 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
 }
 
 export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> {
-  const rugResponse = await axios.get<RugResponse>("https://api.rugcheck.xyz/v1/tokens/" + tokenMint + "/report/summary", {
+  const rugResponse = await axios.get<RugResponseExtended>("https://api.rugcheck.xyz/v1/tokens/" + tokenMint + "/report", {
     timeout: config.tx.get_timeout,
   });
 
@@ -284,29 +326,130 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
     console.log(rugResponse.data);
   }
 
-  // Check if a single user holds more than 30 %
-  for (const risk of rugResponse.data.risks) {
-    if (risk.name === "Single holder ownership") {
-      const numericValue = parseFloat(risk.value.replace("%", "")); // Convert percentage string to a number
-      if (numericValue > config.rug_check.single_holder_ownership) {
-        return false; // Return false immediately if value exceeds 30%
-      }
+  // Extract information
+  const tokenReport: RugResponseExtended = rugResponse.data;
+  const tokenCreator = tokenReport.creator;
+  const mintAuthority = tokenReport.token.mintAuthority;
+  const freezeAuthority = tokenReport.token.freezeAuthority;
+  const isInitialized = tokenReport.token.isInitialized;
+  const supply = tokenReport.token.supply;
+  const decimals = tokenReport.token.decimals;
+  const tokenName = tokenReport.tokenMeta.name;
+  const tokenSymbol = tokenReport.tokenMeta.symbol;
+  const tokenMutable = tokenReport.tokenMeta.mutable;
+  const topHolders = tokenReport.topHolders;
+  const markets = tokenReport.markets.length;
+  const totalLPProviders = tokenReport.totalLPProviders;
+  const totalMarketLiquidity = tokenReport.totalMarketLiquidity;
+  const isRugged = tokenReport.rugged;
+  const rugScore = tokenReport.score;
+  const rugRisks = tokenReport.risks;
+
+  // Get config
+  const rugCheckConfig = config.rug_check;
+
+  // Set conditions
+  const conditions = [
+    {
+      check: !rugCheckConfig.allow_mint_authority && mintAuthority !== null,
+      message: "🚫 Mint authority should be null",
+    },
+    {
+      check: !rugCheckConfig.allow_not_initialized && !isInitialized,
+      message: "🚫 Token is not initialized",
+    },
+    {
+      check: !rugCheckConfig.allow_freeze_authority && freezeAuthority !== null,
+      message: "🚫 Freeze authority should be null",
+    },
+    {
+      check: !rugCheckConfig.allow_mutable && tokenMutable !== false,
+      message: "🚫 Mutable should be false",
+    },
+    {
+      check: !rugCheckConfig.allow_insider_topholders && topHolders.some((holder) => holder.insider),
+      message: "🚫 Insider accounts should not be part of the top holders",
+    },
+    {
+      check: topHolders.some((holder) => holder.pct > rugCheckConfig.max_alowed_pct_topholders),
+      message: "🚫 An individual top holder cannot hold more than the allowed percentage of the total supply",
+    },
+    {
+      check: totalLPProviders < rugCheckConfig.min_total_lp_providers,
+      message: "🚫 Not enough LP Providers.",
+    },
+    {
+      check: markets < rugCheckConfig.min_total_markets,
+      message: "🚫 Not enough Markets.",
+    },
+    {
+      check: totalMarketLiquidity < rugCheckConfig.min_total_market_Liquidity,
+      message: "🚫 Not enough Market Liquidity.",
+    },
+    {
+      check: !rugCheckConfig.allow_rugged && isRugged, //true
+      message: "🚫 Token is rugged",
+    },
+    {
+      check: rugCheckConfig.block_symbols.includes(tokenSymbol),
+      message: "🚫 Symbol is blocked",
+    },
+    {
+      check: rugCheckConfig.block_names.includes(tokenName),
+      message: "🚫 Name is blocked",
+    },
+    {
+      check: rugScore > rugCheckConfig.max_score && rugCheckConfig.max_score !== 0,
+      message: "🚫 Rug score to high.",
+    },
+    {
+      check: rugRisks.some((risk) => config.rug_check.legacy_not_allowed.includes(risk.name)),
+      message: "🚫 Token has legacy risks that are not allowed.",
+    },
+  ];
+
+  // Create new token record
+  const newToken: NewTokenRecord = {
+    time: Date.now(),
+    mint: tokenMint,
+    name: tokenName,
+    creator: tokenCreator,
+  };
+  await insertNewToken(newToken).catch((err) => {
+    if (config.rug_check.block_returning_token_names || config.rug_check.block_returning_token_creators) {
+      console.log("⛔ Unable to store new token for tracking duplicate tokens: " + err);
     }
-    if (risk.name === "Low Liquidity") {
-      const numericValue = parseFloat(risk.value.replace("%", ""));
-      if (numericValue > config.rug_check.low_liquidity) {
-        return false; // Return false immediately if value is smaller than 10000
+  });
+
+  // If tracking duplicate tokens is enabled
+  if (config.rug_check.block_returning_token_names || config.rug_check.block_returning_token_creators) {
+    // Get duplicates based on token min and creator
+    const duplicate = await selectTokenByNameAndCreator(tokenName, tokenCreator);
+
+    // Verify if duplicate token or creator was returned
+    if (duplicate.length !== 0) {
+      if (config.rug_check.block_returning_token_names && duplicate.some((token) => token.name === tokenName)) {
+        console.log("🚫 Token with this name was already created");
+        return false;
+      }
+      if (config.rug_check.block_returning_token_creators && duplicate.some((token) => token.creator === tokenCreator)) {
+        console.log("🚫 Token from this creator was already created");
+        return false;
       }
     }
   }
 
-  // Check for valid liquidity and if not copy cat token.
-  function isRiskAcceptable(tokenDetails: RugResponse): boolean {
-    const notAllowed = config.rug_check.not_allowed;
-    return !tokenDetails.risks.some((risk) => notAllowed.includes(risk.name));
+  //Validate conditions
+  for (const condition of conditions) {
+    if (condition.check) {
+      if (config.rug_check.verbose_log && config.rug_check.verbose_log === true) {
+        console.log(condition.message);
+      }
+      return false;
+    }
   }
 
-  return isRiskAcceptable(rugResponse.data);
+  return true;
 }
 
 export async function fetchAndSaveSwapDetails(tx: string): Promise<boolean> {
@@ -363,24 +506,11 @@ export async function fetchAndSaveSwapDetails(tx: string): Promise<boolean> {
     const perTokenUsdcPrice = solPaidUsdc / swapTransactionData.tokenOutputs[0].tokenAmount;
 
     // Get token meta data
-    const metadataReponse = await axios.post<HoldingMetadata>(
-      rpcUrl,
-      JSON.stringify({
-        jsonrpc: "2.0",
-        id: "test",
-        method: "getAsset",
-        params: {
-          id: swapTransactionData.tokenOutputs[0].mint,
-        },
-      }),
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: config.tx.get_timeout,
-      }
-    );
-    const tokenName = metadataReponse?.data?.result?.content?.metadata?.name || "N/A";
+    let tokenName = "N/A";
+    const tokenData: NewTokenRecord[] = await selectTokenByMint(swapTransactionData.tokenOutputs[0].mint);
+    if (tokenData) {
+      tokenName = tokenData[0].name;
+    }
 
     // Add holding to db
     const newHolding: HoldingRecord = {

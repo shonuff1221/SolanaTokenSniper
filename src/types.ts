@@ -1,4 +1,4 @@
-export interface DisplayDataItem {
+export interface MintsDataReponse {
   tokenMint?: string;
   solMint?: string;
 }
@@ -29,17 +29,66 @@ export interface SerializedQuoteResponse {
   simulationError: string | null;
 }
 
-export interface RugResponse {
+export interface RugResponseExtended {
+  mint: string;
   tokenProgram: string;
-  tokenType: string;
-  risks: Array<{
+  creator: string;
+  token: {
+    mintAuthority: string | null;
+    supply: number;
+    decimals: number;
+    isInitialized: boolean;
+    freezeAuthority: string | null;
+  };
+  token_extensions: any | null;
+  tokenMeta: {
+    name: string;
+    symbol: string;
+    uri: string;
+    mutable: boolean;
+    updateAuthority: string;
+  };
+  topHolders: {
+    address: string;
+    amount: number;
+    decimals: number;
+    pct: number;
+    uiAmount: number;
+    uiAmountString: string;
+    owner: string;
+    insider: boolean;
+  }[];
+  freezeAuthority: string | null;
+  mintAuthority: string | null;
+  risks: {
     name: string;
     value: string;
     description: string;
     score: number;
     level: string;
-  }>;
+  }[];
   score: number;
+  fileMeta: {
+    description: string;
+    name: string;
+    symbol: string;
+    image: string;
+  };
+  lockerOwners: Record<string, any>;
+  lockers: Record<string, any>;
+  lpLockers: any | null;
+  markets: {
+    pubkey: string;
+    marketType: string;
+    mintA: string;
+    mintB: string;
+    mintLP: string;
+    liquidityA: string;
+    liquidityB: string;
+  }[];
+  totalMarketLiquidity: number;
+  totalLPProviders: number;
+  rugged: boolean;
 }
 
 export interface WebSocketRequest {
@@ -226,75 +275,12 @@ export interface HoldingRecord {
   Program: string;
 }
 
-export interface HoldingMetadata {
-  jsonrpc: string;
-  id: string;
-  result: {
-    interface: string;
-    id: string;
-    content: {
-      $schema: string;
-      json_uri: string;
-      files: Array<any>; // This can be an array of any type since no specific structure is defined for files
-      metadata: {
-        name: string;
-        symbol: string;
-      };
-    };
-    authorities: Array<{
-      address: string;
-      scopes: Array<string>;
-    }>;
-    compression: {
-      eligible: boolean;
-      compressed: boolean;
-      data_hash: string;
-      creator_hash: string;
-      asset_hash: string;
-      tree: string;
-      seq: number;
-      leaf_id: number;
-    };
-    grouping: Array<{
-      group_key: string;
-      group_value: string;
-    }>;
-    royalty: {
-      royalty_model: string;
-      target: string;
-      percent: number;
-      basis_points: number;
-      primary_sale_happened: boolean;
-      locked: boolean;
-    };
-    creators: Array<{
-      address: string;
-      share: number;
-      verified: boolean;
-    }>;
-    ownership: {
-      frozen: boolean;
-      delegated: boolean;
-      delegate: string;
-      ownership_model: string;
-      owner: string;
-    };
-    supply: {
-      print_max_supply: number;
-      print_current_supply: number;
-      edition_nonce: number;
-    };
-    mutable: boolean;
-    burnt: boolean;
-    token_info: {
-      supply: number;
-      decimals: number;
-      token_program: string;
-      mint_authority: string;
-      freeze_authority: string;
-    };
-  };
+export interface NewTokenRecord {
+  id?: number; // Optional because it's added by the database
+  time: number;
+  name: string;
+  mint: string;
+  creator: string;
 }
-
 // Update to reflect an array of transactions
 export type TransactionDetailsResponseArray = TransactionDetailsResponse[];
