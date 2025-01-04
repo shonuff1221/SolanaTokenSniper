@@ -27,10 +27,6 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 - Auto-sell feature using Stop Loss and Take Profit
 - Utils: Solana Wallet (keypair) creator
 
-### Contributors
-
-[mrevolverz](https://github.com/mrevolverz)
-
 ### Prerequisites, Installation and Usage Instructions
 
 1. Ensure [Node.js](https://nodejs.org/en) is installed on your computer.
