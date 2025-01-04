@@ -34,7 +34,7 @@ export const config = {
     track_public_wallet: "", // If set an additional log line will be shown with a link to track your wallet
   },
   rug_check: {
-    verbose_log: true,
+    verbose_log: false,
     // Dangerous
     allow_mint_authority: false, // The mint authority is the address that has permission to mint (create) new tokens. Strongly Advised to set to false.
     allow_not_initialized: false, // This indicates whether the token account is properly set up on the blockchain. Strongly Advised to set to false
@@ -47,13 +47,13 @@ export const config = {
     block_symbols: ["BTC16", "BTC17"],
     block_names: ["BTC16", "BTC17"],
     allow_insider_topholders: false, // Allow inseder accounts to be part of the topholders
-    max_alowed_pct_topholders: 90, // Max allowed percentage an individual topholder might hold
+    max_alowed_pct_topholders: 25, // Max allowed percentage an individual topholder might hold
     // Warning
     min_total_markets: 1,
     min_total_lp_providers: 1,
-    min_total_market_Liquidity: 1000,
+    min_total_market_Liquidity: 9000,
     // Misc
-    ignore_pump_fun: false,
+    ignore_pump_fun: true,
     max_score: 0, // Set to 0 to ignore
     legacy_not_allowed: [
       "Freeze Authority still enabled",
