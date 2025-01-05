@@ -328,7 +328,7 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
 
   // Extract information
   const tokenReport: RugResponseExtended = rugResponse.data;
-  const tokenCreator = tokenReport.creator;
+  const tokenCreator = tokenReport.creator ? tokenReport.creator : tokenMint;
   const mintAuthority = tokenReport.token.mintAuthority;
   const freezeAuthority = tokenReport.token.freezeAuthority;
   const isInitialized = tokenReport.token.isInitialized;
@@ -338,7 +338,7 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
   const tokenSymbol = tokenReport.tokenMeta.symbol;
   const tokenMutable = tokenReport.tokenMeta.mutable;
   const topHolders = tokenReport.topHolders;
-  const markets = tokenReport.markets.length;
+  const markets = tokenReport.markets ? tokenReport.markets.length : 0;
   const totalLPProviders = tokenReport.totalLPProviders;
   const totalMarketLiquidity = tokenReport.totalMarketLiquidity;
   const isRugged = tokenReport.rugged;
@@ -408,19 +408,6 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
     },
   ];
 
-  // Create new token record
-  const newToken: NewTokenRecord = {
-    time: Date.now(),
-    mint: tokenMint,
-    name: tokenName,
-    creator: tokenCreator,
-  };
-  await insertNewToken(newToken).catch((err) => {
-    if (config.rug_check.block_returning_token_names || config.rug_check.block_returning_token_creators) {
-      console.log("⛔ Unable to store new token for tracking duplicate tokens: " + err);
-    }
-  });
-
   // If tracking duplicate tokens is enabled
   if (config.rug_check.block_returning_token_names || config.rug_check.block_returning_token_creators) {
     // Get duplicates based on token min and creator
@@ -439,12 +426,23 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
     }
   }
 
+  // Create new token record
+  const newToken: NewTokenRecord = {
+    time: Date.now(),
+    mint: tokenMint,
+    name: tokenName,
+    creator: tokenCreator,
+  };
+  await insertNewToken(newToken).catch((err) => {
+    if (config.rug_check.block_returning_token_names || config.rug_check.block_returning_token_creators) {
+      console.log("⛔ Unable to store new token for tracking duplicate tokens: " + err);
+    }
+  });
+
   //Validate conditions
   for (const condition of conditions) {
     if (condition.check) {
-      if (config.rug_check.verbose_log && config.rug_check.verbose_log === true) {
-        console.log(condition.message);
-      }
+      console.log(condition.message);
       return false;
     }
   }
