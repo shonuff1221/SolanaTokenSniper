@@ -127,6 +127,8 @@ async function main() {
     // Output updated holdings
     console.clear();
     console.log(holdingLogs.join("\n"));
+
+    // Output no holdings found
     if (holdings.length === 0) console.log("No token holdings yet as of", new Date().toISOString());
 
     // Output wallet tracking if set in config

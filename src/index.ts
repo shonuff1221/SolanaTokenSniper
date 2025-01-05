@@ -77,7 +77,7 @@ async function processTransaction(signature: string): Promise<void> {
   console.log("😈 BullX: https://neo.bullx.io/terminal?chainId=1399811149&address=" + data.tokenMint);
 
   // Check if simulation mode is enabled
-  if (config.settings.simulation_mode) {
+  if (config.rug_check.simulation_mode) {
     console.log("👀 Token not swapped. Simulation mode is enabled.");
     console.log("🟢 Resuming looking for new tokens..\n");
     return;

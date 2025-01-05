@@ -1,7 +1,4 @@
 export const config = {
-  settings: {
-    simulation_mode: false, // If true, the sniper will not swap (buy) the token but just display.
-  },
   liquidity_pool: {
     radiyum_program_id: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
     wsol_pc_mint: "So11111111111111111111111111111111111111112",
@@ -35,6 +32,7 @@ export const config = {
   },
   rug_check: {
     verbose_log: false,
+    simulation_mode: true,
     // Dangerous
     allow_mint_authority: false, // The mint authority is the address that has permission to mint (create) new tokens. Strongly Advised to set to false.
     allow_not_initialized: false, // This indicates whether the token account is properly set up on the blockchain. Strongly Advised to set to false
@@ -42,23 +40,25 @@ export const config = {
     allow_rugged: false,
     // Critical
     allow_mutable: false,
-    block_returning_token_names: false,
-    block_returning_token_creators: false,
-    block_symbols: ["BTC16", "BTC17"],
-    block_names: ["BTC16", "BTC17"],
+    block_returning_token_names: true,
+    block_returning_token_creators: true,
+    block_symbols: ["XXX"],
+    block_names: ["XXX"],
     allow_insider_topholders: false, // Allow inseder accounts to be part of the topholders
-    max_alowed_pct_topholders: 25, // Max allowed percentage an individual topholder might hold
+    max_alowed_pct_topholders: 1, // Max allowed percentage an individual topholder might hold
     // Warning
-    min_total_markets: 1,
-    min_total_lp_providers: 1,
-    min_total_market_Liquidity: 9000,
+    min_total_markets: 999,
+    min_total_lp_providers: 999,
+    min_total_market_Liquidity: 1000000,
     // Misc
     ignore_pump_fun: true,
-    max_score: 0, // Set to 0 to ignore
+    max_score: 1, // Set to 0 to ignore
     legacy_not_allowed: [
+      "Low Liquidity",
+      "Single holder ownership",
+      "High holder concentration",
       "Freeze Authority still enabled",
       "Large Amount of LP Unlocked",
-      "High holder concentration",
       "Copycat token",
       "Low amount of LP Providers",
     ],
