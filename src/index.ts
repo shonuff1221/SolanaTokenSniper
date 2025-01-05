@@ -84,7 +84,7 @@ async function processTransaction(signature: string): Promise<void> {
   }
 
   // Add initial delay before first buy
-  await new Promise((resolve) => setTimeout(resolve, config.tx.initial_delay));
+  await new Promise((resolve) => setTimeout(resolve, config.tx.swap_tx_initial_delay));
 
   // Create Swap transaction
   const tx = await createSwapTransaction(data.solMint, data.tokenMint);

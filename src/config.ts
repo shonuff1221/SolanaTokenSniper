@@ -5,14 +5,14 @@ export const config = {
   },
   tx: {
     fetch_tx_max_retries: 10,
-    fetch_tx_initial_delay: 3000,
+    fetch_tx_initial_delay: 3000, // Initial delay before fetching LP creation transaction details (3 seconds)
+    swap_tx_initial_delay: 1000, // Initial delay before first buy (1 second)
     get_timeout: 10000, // Timeout for API requests
     concurrent_transactions: 1, // Number of simultaneous transactions
-    initial_delay: 1000, // Initial delay before first buy (1 second)
     retry_delay: 500, // Delay between retries (0.5 seconds)
   },
   swap: {
-    verbose_log: true,
+    verbose_log: false,
     prio_fee_max_lamports: 1000000, // 0.001 SOL
     prio_level: "veryHigh", // If you want to land transaction fast, set this to use `veryHigh`. You will pay on average higher priority fee.
     amount: "10000000", //0.01 SOL
@@ -26,8 +26,8 @@ export const config = {
     prio_level: "veryHigh", // If you want to land transaction fast, set this to use `veryHigh`. You will pay on average higher priority fee.
     slippageBps: "200", // 2%
     auto_sell: false, // If set to true, stop loss and take profit triggers automatically when set.
-    stop_loss_percent: 100,
-    take_profit_percent: 20,
+    stop_loss_percent: 5,
+    take_profit_percent: 50,
     track_public_wallet: "", // If set an additional log line will be shown with a link to track your wallet
   },
   rug_check: {
