@@ -337,16 +337,47 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
   const tokenName = tokenReport.tokenMeta.name;
   const tokenSymbol = tokenReport.tokenMeta.symbol;
   const tokenMutable = tokenReport.tokenMeta.mutable;
-  const topHolders = tokenReport.topHolders;
-  const markets = tokenReport.markets ? tokenReport.markets.length : 0;
+  let topHolders = tokenReport.topHolders;
+  const marketsLength = tokenReport.markets ? tokenReport.markets.length : 0;
   const totalLPProviders = tokenReport.totalLPProviders;
   const totalMarketLiquidity = tokenReport.totalMarketLiquidity;
   const isRugged = tokenReport.rugged;
   const rugScore = tokenReport.score;
-  const rugRisks = tokenReport.risks;
+  const rugRisks = tokenReport.risks
+    ? tokenReport.risks
+    : [
+        {
+          name: "Good",
+          value: "",
+          description: "",
+          score: 0,
+          level: "good",
+        },
+      ];
+
+  // Update topholders if liquidity pools are excluded
+  if (config.rug_check.exclude_lp_from_topholders) {
+    // local types
+    type Market = {
+      liquidityA?: string;
+      liquidityB?: string;
+    };
+
+    const markets: Market[] | undefined = tokenReport.markets;
+    if (markets) {
+      // Safely extract liquidity addresses from markets
+      const liquidityAddresses: string[] = (markets ?? [])
+        .flatMap((market) => [market.liquidityA, market.liquidityB])
+        .filter((address): address is string => !!address);
+
+      // Filter out topHolders that match any of the liquidity addresses
+      topHolders = topHolders.filter((holder) => !liquidityAddresses.includes(holder.address));
+    }
+  }
 
   // Get config
   const rugCheckConfig = config.rug_check;
+  const rugCheckLegacy = rugCheckConfig.legacy_not_allowed;
 
   // Set conditions
   const conditions = [
@@ -379,7 +410,7 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
       message: "🚫 Not enough LP Providers.",
     },
     {
-      check: markets < rugCheckConfig.min_total_markets,
+      check: marketsLength < rugCheckConfig.min_total_markets,
       message: "🚫 Not enough Markets.",
     },
     {
@@ -403,7 +434,7 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
       message: "🚫 Rug score to high.",
     },
     {
-      check: rugRisks.some((risk) => config.rug_check.legacy_not_allowed.includes(risk.name)),
+      check: rugRisks.some((risk) => rugCheckLegacy.includes(risk.name)),
       message: "🚫 Token has legacy risks that are not allowed.",
     },
   ];

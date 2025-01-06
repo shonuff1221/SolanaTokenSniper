@@ -18,7 +18,7 @@ import { fetchTransactionDetails, createSwapTransaction, getRugCheckConfirmed, f
 })();
 
 (async () => {
-  const testId = "9TX6KfhW4j4MF5hsnsZcjPxramDKeHEyeNqN81R2pump";
+  const testId = null;
   if (testId) {
     const tx = await getRugCheckConfirmed(testId);
     console.log("result:", tx);

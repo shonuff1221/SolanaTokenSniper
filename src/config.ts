@@ -46,6 +46,7 @@ export const config = {
     block_names: ["XXX"],
     allow_insider_topholders: false, // Allow inseder accounts to be part of the topholders
     max_alowed_pct_topholders: 1, // Max allowed percentage an individual topholder might hold
+    exclude_lp_from_topholders: false, // If true, Liquidity Pools will not be seen as top holders
     // Warning
     min_total_markets: 999,
     min_total_lp_providers: 999,
