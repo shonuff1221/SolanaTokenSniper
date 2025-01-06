@@ -118,7 +118,7 @@ async function websocketHandler(): Promise<void> {
   // Send subscription to the websocket once the connection is open
   ws.on("open", () => {
     // Unsubscribe
-    if (ws) sendUnsubscribeRequest(ws); // Send a request once the WebSocket is open
+    if (ws && !init) sendUnsubscribeRequest(ws); // Send a request once the WebSocket is open
     // Subscribe
     if (ws) sendSubscribeRequest(ws); // Send a request once the WebSocket is open
     console.log("\n🔓 WebSocket is open and listening.");
