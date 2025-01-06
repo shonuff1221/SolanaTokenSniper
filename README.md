@@ -38,6 +38,7 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 
 ### Update Log
 
+- 06-dec-2024:11: Add rugcheck option: Exclude LP from topholders
 - 02-dec-2024:16: Change Metadata RCP request to local database lookup
 - 02-dec-2024:16: Expanded Rug check
 - 02-dec-2024:16: Added new token tracker for rug check duplicates functionality and meta data
