@@ -1,5 +1,5 @@
 import axios from "axios";
-import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
+import { Connection, Keypair, VersionedTransaction, PublicKey } from "@solana/web3.js";
 import { Wallet } from "@project-serum/anchor";
 import bs58 from "bs58";
 import dotenv from "dotenv";
@@ -13,6 +13,7 @@ import {
   HoldingRecord,
   RugResponseExtended,
   NewTokenRecord,
+  createSellTransactionResponse,
 } from "./types";
 import { insertHolding, insertNewToken, removeHolding, selectTokenByMint, selectTokenByNameAndCreator } from "./tracker/db";
 
@@ -568,15 +569,37 @@ export async function fetchAndSaveSwapDetails(tx: string): Promise<boolean> {
   }
 }
 
-export async function createSellTransaction(solMint: string, tokenMint: string, amount: string): Promise<string | null> {
+export async function createSellTransaction(solMint: string, tokenMint: string, amount: string): Promise<createSellTransactionResponse> {
   const quoteUrl = process.env.JUP_HTTPS_QUOTE_URI || "";
   const swapUrl = process.env.JUP_HTTPS_SWAP_URI || "";
   const rpcUrl = process.env.HELIUS_HTTPS_URI || "";
   const myWallet = new Wallet(Keypair.fromSecretKey(bs58.decode(process.env.PRIV_KEY_WALLET || "")));
+  const connection = new Connection(rpcUrl);
 
   try {
-    // @TODO: Verify if the user still holds this token to make sure we can sell it.
-    // https://docs.helius.dev/compression-and-das-api/digital-asset-standard-das-api/get-assets-by-owner
+    // Check token balance using RPC connection
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(myWallet.publicKey, {
+      mint: new PublicKey(tokenMint),
+    });
+
+    //Check if token exists in wallet with non-zero balance
+    const totalBalance = tokenAccounts.value.reduce((sum, account) => {
+      const tokenAmount = account.account.data.parsed.info.tokenAmount.amount;
+      return sum + BigInt(tokenAmount); // Use BigInt for precise calculations
+    }, BigInt(0));
+
+    // Verify returned balance
+    if (totalBalance <= 0n) {
+      await removeHolding(tokenMint).catch((err) => {
+        console.log("⛔ Database Error: " + err);
+      });
+      throw new Error(`Token has 0 balance - Already sold elsewhere. Removing from tracking.`);
+    }
+
+    // Verify amount with tokenBalance
+    if (totalBalance !== BigInt(amount)) {
+      throw new Error(`Wallet and tracker balance mismatch. Sell manually and token will be removed during next price check.`);
+    }
 
     // Request a quote in order to swap SOL for new token
     const quoteResponse = await axios.get<QuoteResponse>(quoteUrl, {
@@ -589,7 +612,10 @@ export async function createSellTransaction(solMint: string, tokenMint: string, 
       timeout: config.tx.get_timeout,
     });
 
-    if (!quoteResponse.data) return null;
+    // Throw error if no quote was received
+    if (!quoteResponse.data) {
+      throw new Error("No valid quote for selling the token was received from Jupiter!");
+    }
 
     // Serialize the quote into a swap transaction that can be submitted on chain
     const swapTransaction = await axios.post<SerializedQuoteResponse>(
@@ -620,7 +646,11 @@ export async function createSellTransaction(solMint: string, tokenMint: string, 
         timeout: config.tx.get_timeout,
       }
     );
-    if (!swapTransaction.data) return null;
+
+    // Throw error if no quote was received
+    if (!swapTransaction.data) {
+      throw new Error("No valid swap transaction was received from Jupiter!");
+    }
 
     // deserialize the transaction
     const swapTransactionBuf = Buffer.from(swapTransaction.data.swapTransaction, "base64");
@@ -628,10 +658,6 @@ export async function createSellTransaction(solMint: string, tokenMint: string, 
 
     // sign the transaction
     transaction.sign([myWallet.payer]);
-
-    // get the latest block hash
-    const connection = new Connection(rpcUrl);
-    const latestBlockHash = await connection.getLatestBlockhash();
 
     // Execute the transaction
     const rawTransaction = transaction.serialize();
@@ -642,8 +668,11 @@ export async function createSellTransaction(solMint: string, tokenMint: string, 
 
     // Return null when no tx was returned
     if (!txid) {
-      return null;
+      throw new Error("Could not send transaction that was signed and serialized!");
     }
+
+    // get the latest block hash
+    const latestBlockHash = await connection.getLatestBlockhash();
 
     // Fetch the current status of a transaction signature (processed, confirmed, finalized).
     const conf = await connection.confirmTransaction({
@@ -654,17 +683,24 @@ export async function createSellTransaction(solMint: string, tokenMint: string, 
 
     // Return null when an error occured when confirming the transaction
     if (conf.value.err || conf.value.err !== null) {
-      return null;
+      throw new Error("Transaction was not successfully confirmed!");
     }
 
     // Delete holding
-    removeHolding(tokenMint).catch((err) => {
+    await removeHolding(tokenMint).catch((err) => {
       console.log("⛔ Database Error: " + err);
     });
 
-    return txid;
+    return {
+      success: true,
+      msg: null,
+      tx: txid,
+    };
   } catch (error: any) {
-    console.error("Error while creating and submitting transaction:", error.message);
-    return null;
+    return {
+      success: false,
+      msg: error instanceof Error ? error.message : "Unknown error",
+      tx: null,
+    };
   }
 }

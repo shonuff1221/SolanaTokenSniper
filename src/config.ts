@@ -22,6 +22,7 @@ export const config = {
     token_not_tradable_400_error_delay: 2000, // How many seconds should the bot wait before retrying to get a quote again
   },
   sell: {
+    price_source: "dex", // dex=Dexscreener,jup=Jupiter Agregator (Dex is most accurate and Jupiter is always used as fallback)
     prio_fee_max_lamports: 1000000, // 0.001 SOL
     prio_level: "veryHigh", // If you want to land transaction fast, set this to use `veryHigh`. You will pay on average higher priority fee.
     slippageBps: "200", // 2%

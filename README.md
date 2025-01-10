@@ -38,16 +38,19 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 
 ### Update Log
 
-- 06-dec-2024:11: Add rugcheck option: Exclude LP from topholders
-- 02-dec-2024:16: Change Metadata RCP request to local database lookup
-- 02-dec-2024:16: Expanded Rug check
-- 02-dec-2024:16: Added new token tracker for rug check duplicates functionality and meta data
-- 02-dec-2024:16: Added Simulation Mode to skip the actual swap
-- 02-dec-2024:16: Added logsUnsubscribe before subscribing to RPC logsSubscribe method
-- 02-dec-2024:16: Improved fetchTransactionDetails() error handling
-- 02-dec-2024:16: Updated fetchTransactionDetails() to use retry based on count instead of time
-- 02-dec-2024:16: Process transaction asynchronously and add max concurrent transactions
-- 02-dec-2024:16: Revert back to native punycode as libraries are identical.
+- 10-jan-2025:21: Added Dexscreener Tokens API as price source for tracker with option in config.
+- 09-jan-2025:21: Added token wallet balance, an amount mismatch check before trying to sell TP or SL to prevent quoting fees.
+- 09-jan-2025:15: Added .env validator to check if all .env variables are properly set
+- 06-jan-2025:11: Add rugcheck option: Exclude LP from topholders
+- 02-jan-2025:16: Change Metadata RCP request to local database lookup
+- 02-jan-2025:16: Expanded Rug check
+- 02-jan-2025:16: Added new token tracker for rug check duplicates functionality and meta data
+- 02-jan-2025:16: Added Simulation Mode to skip the actual swap
+- 02-jan-2025:16: Added logsUnsubscribe before subscribing to RPC logsSubscribe method
+- 02-jan-2025:16: Improved fetchTransactionDetails() error handling
+- 02-jan-2025:16: Updated fetchTransactionDetails() to use retry based on count instead of time
+- 02-jan-2025:16: Process transaction asynchronously and add max concurrent transactions
+- 02-jan-2025:16: Revert back to native punycode as libraries are identical.
 - 30-dec-2024:21: Added patch-package dev dependency to apply patches/tr46+0.0.3.patch
 - 30-dec-2024:21: Added punycode.js package to resolve [issue](https://github.com/mathiasbynens/punycode.js/issues/137).
 - 21-dec-2024:19: Added createSellTransaction() in transactions.ts to sell SL and TP tokens.

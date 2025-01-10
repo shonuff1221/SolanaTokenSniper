@@ -4,15 +4,21 @@ import * as sqlite3 from "sqlite3";
 import dotenv from "dotenv";
 import { open } from "sqlite";
 import { createTableHoldings } from "./db";
-import { HoldingRecord } from "../types";
+import { createSellTransactionResponse, HoldingRecord, LastPriceDexReponse } from "../types";
 import { DateTime } from "luxon";
 import { createSellTransaction } from "../transactions";
 
 // Load environment variables from the .env file
 dotenv.config();
 
+// Create Action Log constant
+const actionsLogs: string[] = [];
+
 async function main() {
   const priceUrl = process.env.JUP_HTTPS_PRICE_URI || "";
+  const dexPriceUrl = process.env.DEX_HTTPS_LATEST_TOKENS || "";
+  const priceSource = config.sell.price_source || "jup";
+  const solMint = config.liquidity_pool.wsol_pc_mint;
 
   // Connect to database and create if not exists
   const db = await open({
@@ -30,11 +36,14 @@ async function main() {
 
   // Proceed with tracker
   if (holdingsTableExist) {
-    // Create a place to store our updated holdings before showing them.
+    // Create const for holdings and action logs.
     const holdingLogs: string[] = [];
-    const saveLog = (...args: unknown[]): void => {
+    let currentPriceSource = "Jupiter Agregator";
+
+    // Create regional functions to push holdings and logs to const
+    const saveLogTo = (logsArray: string[], ...args: unknown[]): void => {
       const message = args.map((arg) => String(arg)).join(" ");
-      holdingLogs.push(message);
+      logsArray.push(message);
     };
 
     // Get all our current holdings
@@ -43,10 +52,7 @@ async function main() {
       // Get all token ids
       const tokenValues = holdings.map((holding) => holding.Token).join(",");
 
-      // @TODO, add more sources for current prices. Now our price is the current price based on the Jupiter Last Swap (sell/buy) price
-
-      // Get latest tokens Price
-      const solMint = config.liquidity_pool.wsol_pc_mint;
+      // Jupiter Agragator Price
       const priceResponse = await axios.get<any>(priceUrl, {
         params: {
           ids: tokenValues + "," + solMint,
@@ -54,12 +60,40 @@ async function main() {
         },
         timeout: config.tx.get_timeout,
       });
-
-      // Verify if we received the latest prices
       const currentPrices = priceResponse.data.data;
       if (!currentPrices) {
-        console.log("⛔ Latest price could not be fetched. Trying again...");
+        saveLogTo(actionsLogs, `⛔ Latest prices from Jupiter Agregator could not be fetched. Trying again...`);
         return;
+      }
+
+      // DexScreener Agragator Price
+      let dexRaydiumPairs = null;
+      if (priceSource !== "jup") {
+        const dexPriceUrlPairs = `${dexPriceUrl}${tokenValues}`;
+        const priceResponseDex = await axios.get<any>(dexPriceUrlPairs, {
+          timeout: config.tx.get_timeout,
+        });
+        const currentPricesDex: LastPriceDexReponse = priceResponseDex.data;
+
+        // Get raydium legacy pairs prices
+        dexRaydiumPairs = currentPricesDex.pairs
+          .filter((pair) => pair.dexId === "raydium")
+          .reduce<Array<(typeof currentPricesDex.pairs)[0]>>((uniquePairs, pair) => {
+            // Check if the baseToken address already exists
+            const exists = uniquePairs.some((p) => p.baseToken.address === pair.baseToken.address);
+
+            // If it doesn't exist or the existing one has labels, replace it with the no-label version
+            if (!exists || (pair.labels && pair.labels.length === 0)) {
+              return uniquePairs.filter((p) => p.baseToken.address !== pair.baseToken.address).concat(pair);
+            }
+
+            return uniquePairs;
+          }, []);
+
+        if (!currentPrices) {
+          saveLogTo(actionsLogs, `⛔ Latest prices from Dexscreener Tokens API could not be fetched. Trying again...`);
+          return;
+        }
       }
 
       // Loop trough all our current holdings
@@ -83,7 +117,16 @@ async function main() {
           const hrTradeTime = centralEuropenTime.toFormat("HH:mm:ss");
 
           // Get current price
-          const tokenCurrentPrice = currentPrices[token]?.extraInfo?.lastSwappedPrice?.lastJupiterSellPrice;
+          let tokenCurrentPrice = currentPrices[token]?.extraInfo?.lastSwappedPrice?.lastJupiterSellPrice;
+          if (priceSource === "dex") {
+            if (dexRaydiumPairs && dexRaydiumPairs?.length !== 0) {
+              currentPriceSource = "Dexscreener Tokens API";
+              const pair = dexRaydiumPairs.find((p: any) => p.baseToken.address === token);
+              tokenCurrentPrice = pair ? pair.priceUsd : tokenCurrentPrice;
+            } else {
+              saveLogTo(actionsLogs, `🚩 Latest prices from Dexscreener Tokens API not fetched. Falling back to Jupiter.`);
+            }
+          }
 
           // Calculate PnL and profit/loss
           const unrealizedPnLUSDC = (tokenCurrentPrice - tokenPerTokenPaidUSDC) * tokenBalance - tokenSolFeePaidUSDC;
@@ -91,53 +134,75 @@ async function main() {
           const iconPnl = unrealizedPnLUSDC > 0 ? "🟢" : "🔴";
 
           // Check SL/TP
-          let sltpMessage = "";
           if (config.sell.auto_sell && config.sell.auto_sell === true) {
             const amountIn = tokenBalance.toString().replace(".", "");
+
+            // Sell via Take Profit
             if (unrealizedPnLPercentage >= config.sell.take_profit_percent) {
-              const tx = await createSellTransaction(config.liquidity_pool.wsol_pc_mint, token, amountIn);
-              if (!tx) {
-                sltpMessage = "⛔ Could not take profit. Trying again in 5 seconds.";
-              }
-              if (tx) {
-                sltpMessage = "Took Profit: " + tx;
+              try {
+                const result: createSellTransactionResponse = await createSellTransaction(config.liquidity_pool.wsol_pc_mint, token, amountIn);
+                const txErrorMsg = result.msg;
+                const txSuccess = result.success;
+                const tXtransaction = result.tx;
+                // Add success to log output
+                if (txSuccess) {
+                  saveLogTo(actionsLogs, `✅🟢 ${hrTradeTime}: Took profit for ${tokenName}\nTx: ${tXtransaction}`);
+                } else {
+                  saveLogTo(actionsLogs, `⚠️ ERROR when taking profit for ${tokenName}: ${txErrorMsg}`);
+                }
+              } catch (error: any) {
+                saveLogTo(actionsLogs, `⚠️  ERROR when taking profit for ${tokenName}: ${error.message}`);
               }
             }
+
+            // Sell via Stop Loss
             if (unrealizedPnLPercentage <= -config.sell.stop_loss_percent) {
-              const tx = await createSellTransaction(config.liquidity_pool.wsol_pc_mint, token, amountIn);
-              if (!tx) {
-                sltpMessage = "⛔ Could not sell stop loss. Trying again in 5 seconds.";
-              }
-              if (tx) {
-                sltpMessage = "Stop Loss triggered: " + tx;
+              try {
+                const result: createSellTransactionResponse = await createSellTransaction(config.liquidity_pool.wsol_pc_mint, token, amountIn);
+                const txErrorMsg = result.msg;
+                const txSuccess = result.success;
+                const tXtransaction = result.tx;
+                // Add success to log output
+                if (txSuccess) {
+                  saveLogTo(actionsLogs, `✅🔴 ${hrTradeTime}: Triggered Stop Loss for ${tokenName}\nTx: ${tXtransaction}`);
+                } else {
+                  saveLogTo(actionsLogs, `⚠️ ERROR when triggering Stop Loss for ${tokenName}: ${txErrorMsg}`);
+                }
+              } catch (error: any) {
+                saveLogTo(actionsLogs, `\n⚠️ ERROR when triggering Stop Loss for ${tokenName}: ${error.message}: \n`);
               }
             }
           }
 
           // Get the current price
-          saveLog(
-            `${hrTradeTime} Buy ${tokenBalance} ${tokenName} for $${tokenSolPaidUSDC.toFixed(2)}. ${iconPnl} Unrealized PnL: $${unrealizedPnLUSDC.toFixed(
+          saveLogTo(
+            holdingLogs,
+            `${hrTradeTime}: Buy $${tokenSolPaidUSDC.toFixed(2)} | ${iconPnl} Unrealized PnL: $${unrealizedPnLUSDC.toFixed(
               2
-            )} (${unrealizedPnLPercentage.toFixed(2)}%) ${sltpMessage}`
+            )} (${unrealizedPnLPercentage.toFixed(2)}%) | ${tokenBalance} ${tokenName}`
           );
         })
       );
     }
 
-    // Output updated holdings
+    // Output Current Holdings
     console.clear();
+    console.log(`📈 Current Holdings via ✅ ${currentPriceSource}`);
+    console.log("================================================================================");
+    if (holdings.length === 0) console.log("No token holdings yet as of", new Date().toISOString());
     console.log(holdingLogs.join("\n"));
 
-    // Output no holdings found
-    if (holdings.length === 0) console.log("No token holdings yet as of", new Date().toISOString());
+    // Output Action Logs
+    console.log("\n\n📜 Action Logs");
+    console.log("================================================================================");
+    console.log("Last Update: ", new Date().toISOString());
+    console.log(actionsLogs.join("\n"));
 
     // Output wallet tracking if set in config
     if (config.sell.track_public_wallet) {
       console.log("\nCheck your wallet: https://gmgn.ai/sol/address/" + config.sell.track_public_wallet);
     }
 
-    // Close the database connection when done
-    console.log("Last Update: ", new Date().toISOString());
     await db.close();
   }
 
