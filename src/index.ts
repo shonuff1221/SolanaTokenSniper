@@ -78,13 +78,12 @@ async function processTransaction(signature: string): Promise<void> {
   // Create Swap transaction
   const tx = await createSwapTransaction(data.solMint, data.tokenMint);
   if (!tx) {
-    console.log("⛔ Transaction aborted. No valid id returned.");
+    console.log("⛔ Transaction aborted.");
     console.log("🟢 Resuming looking for new tokens...\n");
     return;
   }
 
   // Output logs
-  console.log("✅ Swap quote recieved.");
   console.log("🚀 Swapping SOL for Token.");
   console.log("Swap Transaction: ", "https://solscan.io/tx/" + tx);
 

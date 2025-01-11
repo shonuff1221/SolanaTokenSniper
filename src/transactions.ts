@@ -135,9 +135,10 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
   const quoteUrl = process.env.JUP_HTTPS_QUOTE_URI || "";
   const swapUrl = process.env.JUP_HTTPS_SWAP_URI || "";
   const rpcUrl = process.env.HELIUS_HTTPS_URI || "";
-  const myWallet = new Wallet(Keypair.fromSecretKey(bs58.decode(process.env.PRIV_KEY_WALLET || "")));
   let quoteResponseData: QuoteResponse | null = null;
   let serializedQuoteResponseData: SerializedQuoteResponse | null = null;
+  const connection = new Connection(rpcUrl);
+  const myWallet = new Wallet(Keypair.fromSecretKey(bs58.decode(process.env.PRIV_KEY_WALLET || "")));
 
   // Get Swap Quote
   let retryCount = 0;
@@ -195,6 +196,8 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
       return null;
     }
   }
+
+  if (quoteResponseData) console.log("✅ Swap quote recieved.");
 
   // Serialize the quote into a swap transaction that can be submitted on chain
   try {
@@ -256,6 +259,8 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
     return null;
   }
 
+  if (serializedQuoteResponseData) console.log("✅ Swap quote serialized.");
+
   // deserialize, sign and send the transaction
   try {
     if (!serializedQuoteResponseData) return null;
@@ -265,8 +270,8 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
     // sign the transaction
     transaction.sign([myWallet.payer]);
 
-    // Create connection with RPC url
-    const connection = new Connection(rpcUrl);
+    // get the latest block hash
+    const latestBlockHash = await connection.getLatestBlockhash();
 
     // Execute the transaction
     const rawTransaction = transaction.serialize();
@@ -277,19 +282,24 @@ export async function createSwapTransaction(solMint: string, tokenMint: string):
 
     // Return null when no tx was returned
     if (!txid) {
+      console.log("🚫 No id received for sent raw transaction.");
       return null;
     }
 
+    if (txid) console.log("✅ Raw transaction id received.");
+
     // Fetch the current status of a transaction signature (processed, confirmed, finalized).
-    const latestBlockHash = await connection.getLatestBlockhash();
     const conf = await connection.confirmTransaction({
       blockhash: latestBlockHash.blockhash,
       lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
       signature: txid,
     });
 
+    if (txid) console.log("🔎 Checking transaction confirmation ...");
+
     // Return null when an error occured when confirming the transaction
     if (conf.value.err || conf.value.err !== null) {
+      console.log("🚫 Transaction confirmation failed.");
       return null;
     }
 
