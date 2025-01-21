@@ -1,8 +1,15 @@
 import WebSocket from "ws"; // Node.js websocket library
 import { WebSocketRequest } from "./types"; // Typescript Types for type safety
 import { config } from "./config"; // Configuration parameters for our bot
-import { fetchTransactionDetails, createSwapTransaction, getRugCheckConfirmed, fetchAndSaveSwapDetails } from "./transactions";
+import { fetchTransactionDetails, getRugCheckConfirmed } from "./transactions";
 import { validateEnv } from "./utils/env-validator";
+import { initTelegram, sendTokenToGroup } from "./telegram";
+
+// Define types
+interface TransactionData {
+  tokenMint: string;
+  solMint: string;
+}
 
 // Regional Variables
 let activeTransactions = 0;
@@ -30,67 +37,58 @@ function sendSubscribeRequest(ws: WebSocket): void {
 async function processTransaction(signature: string): Promise<void> {
   // Output logs
   console.log("=============================================");
-  console.log("🔎 New Liquidity Pool found.");
-  console.log("🔃 Fetching transaction details ...");
+  console.log(" New Liquidity Pool found.");
+  console.log(" Fetching transaction details ...");
 
   // Fetch the transaction details
-  const data = await fetchTransactionDetails(signature);
-  if (!data) {
-    console.log("⛔ Transaction aborted. No data returned.");
-    console.log("🟢 Resuming looking for new tokens...\n");
+  const transactionData = await fetchTransactionDetails(signature);
+
+  if (!transactionData || !transactionData.tokenMint || !transactionData.solMint) {
+    console.log(" Transaction aborted. No data returned or missing required fields.");
+    console.log("✅ Resuming looking for new tokens...\n");
     return;
   }
 
-  // Ensure required data is available
-  if (!data.solMint || !data.tokenMint) return;
+  const data: TransactionData = {
+    tokenMint: transactionData.tokenMint,
+    solMint: transactionData.solMint
+  };
 
   // Check rug check
   const isRugCheckPassed = await getRugCheckConfirmed(data.tokenMint);
   if (!isRugCheckPassed) {
-    console.log("🚫 Rug Check not passed! Transaction aborted.");
-    console.log("🟢 Resuming looking for new tokens...\n");
+    console.log(" Rug Check not passed! Transaction aborted.");
+    console.log("✅ Resuming looking for new tokens...\n");
     return;
   }
 
-  // Handle ignored tokens
+  // Check if token is from pump.fun
   if (data.tokenMint.trim().toLowerCase().endsWith("pump") && config.rug_check.ignore_pump_fun) {
-    // Check if ignored
-    console.log("🚫 Transaction skipped. Ignoring Pump.fun.");
-    console.log("🟢 Resuming looking for new tokens..\n");
+    console.log(" Transaction skipped. Ignoring Pump.fun.");
+    console.log("✅ Resuming looking for new tokens..\n");
     return;
   }
 
   // Ouput logs
-  console.log("Token found");
-  console.log("👽 GMGN: https://gmgn.ai/sol/token/" + data.tokenMint);
-  console.log("😈 BullX: https://neo.bullx.io/terminal?chainId=1399811149&address=" + data.tokenMint);
+  console.log("✅ Token found");
+  console.log(" GMGN: https://gmgn.ai/sol/token/" + data.tokenMint);
+  console.log(" BullX: https://neo.bullx.io/terminal?chainId=1399811149&address=" + data.tokenMint);
 
   // Check if simulation mode is enabled
   if (config.rug_check.simulation_mode) {
-    console.log("👀 Token not swapped. Simulation mode is enabled.");
-    console.log("🟢 Resuming looking for new tokens..\n");
+    console.log("✅ Token not sent to group. Simulation mode is enabled.");
+    console.log("✅ Resuming looking for new tokens..\n");
     return;
   }
 
-  // Add initial delay before first buy
-  await new Promise((resolve) => setTimeout(resolve, config.tx.swap_tx_initial_delay));
-
-  // Create Swap transaction
-  const tx = await createSwapTransaction(data.solMint, data.tokenMint);
-  if (!tx) {
-    console.log("⛔ Transaction aborted.");
-    console.log("🟢 Resuming looking for new tokens...\n");
-    return;
-  }
-
-  // Output logs
-  console.log("🚀 Swapping SOL for Token.");
-  console.log("Swap Transaction: ", "https://solscan.io/tx/" + tx);
-
-  // Fetch and store the transaction for tracking purposes
-  const saveConfirmation = await fetchAndSaveSwapDetails(tx);
-  if (!saveConfirmation) {
-    console.log("❌ Warning: Transaction not saved for tracking! Track Manually!");
+  try {
+    // If token found and Telegram is enabled, send to group
+    if (config.telegram.enabled && config.telegram.group_id) {
+      await sendTokenToGroup(data.tokenMint, config.telegram.group_id);
+      console.log("✅ Token address sent to Telegram group successfully.");
+    }
+  } catch (error) {
+    console.error("❌ Error processing transaction:", error);
   }
 }
 
@@ -129,7 +127,7 @@ async function websocketHandler(): Promise<void> {
 
       // Only log RPC errors for debugging
       if (parsedData.error) {
-        console.error("🚫 RPC Error:", parsedData.error);
+        console.error(" RPC Error:", parsedData.error);
         return;
       }
 
@@ -146,7 +144,7 @@ async function websocketHandler(): Promise<void> {
 
       // Verify if we have reached the max concurrent transactions
       if (activeTransactions >= MAX_CONCURRENT) {
-        console.log("⏳ Max concurrent transactions reached, skipping...");
+        console.log(" Max concurrent transactions reached, skipping...");
         return;
       }
 
@@ -162,7 +160,7 @@ async function websocketHandler(): Promise<void> {
           activeTransactions--;
         });
     } catch (error) {
-      console.error("💥 Error processing message:", {
+      console.error(" Error processing message:", {
         error: error instanceof Error ? error.message : "Unknown error",
         timestamp: new Date().toISOString(),
       });
@@ -171,20 +169,38 @@ async function websocketHandler(): Promise<void> {
 
   ws.on("error", (err: Error) => {
     console.error("WebSocket error:", err);
+    ws = null;
   });
 
   ws.on("close", () => {
-    console.log("📴 WebSocket connection closed, cleaning up...");
+    console.log(" WebSocket connection closed, cleaning up...");
     if (ws) {
       ws.removeAllListeners();
       ws = null;
     }
-    console.log("🔄 Attempting to reconnect in 5 seconds...");
+    console.log(" Attempting to reconnect in 5 seconds...");
     setTimeout(websocketHandler, 5000);
   });
 }
 
-// Start Socket Handler
-websocketHandler().catch((err) => {
-  console.error(err.message);
-});
+// Main function
+async function main(): Promise<void> {
+  try {
+    // Validate environment variables
+    validateEnv();
+
+    // Initialize Telegram if enabled
+    if (config.telegram.enabled) {
+      await initTelegram();
+    }
+
+    // Start WebSocket handler
+    await websocketHandler();
+  } catch (error) {
+    console.error("Error starting application:", error);
+    process.exit(1);
+  }
+}
+
+// Start the application
+main();

@@ -1,10 +1,83 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface MintsDataReponse {
-  tokenMint?: string;
-  solMint?: string;
+  tokenMint: string;
+  solMint: string;
+}
+
+export interface JupiterRouteSwapInfo {
+  ammKey: string;
+  label: string;
+  inputMint: string;
+  outputMint: string;
+  inAmount: string;
+  outAmount: string;
+  feeAmount: string;
+  feeMint: string;
+  priceImpactPct?: number;
+  lpFee?: {
+    amount: string;
+    mint: string;
+    percent: number;
+  };
+  platformFee?: {
+    amount: string;
+    mint: string;
+    percent: number;
+  };
+}
+
+export interface JupiterRoutePlan {
+  swapInfo: JupiterRouteSwapInfo;
+  percent: number;
+}
+
+export interface JupiterQuoteResponse {
+  inputMint: string;
+  inAmount: string;
+  outputMint: string;
+  outAmount: string;
+  otherAmountThreshold: string;
+  swapMode: 'ExactIn' | 'ExactOut';
+  slippageBps: number;
+  platformFee: null | {
+    amount: string;
+    mint: string;
+    percent: number;
+  };
+  priceImpactPct: string;
+  routePlan: JupiterRoutePlan[];
+  scoreReport: null | unknown;
+  contextSlot: number;
+  timeTaken: number;
+  swapUsdValue: string;
+}
+
+export interface JupiterSwapRequestBody {
+  quoteResponse: JupiterQuoteResponse;
+  userPublicKey: string;
+  wrapAndUnwrapSol: boolean;
+  dynamicSlippage?: {
+    maxBps: number;
+  };
+  prioritizationFeeLamports?: {
+    priorityLevelWithMaxLamports: {
+      maxLamports: number;
+      priorityLevel: string;
+    };
+  };
+  asLegacyTransaction?: boolean;
+  useSharedAccounts?: boolean;
+  computeUnitPriceMicroLamports?: number;
+  destinationWallet?: string;
+  feeAccount?: string;
 }
 
 export interface QuoteResponse {
-  data: unknown;
+  data: JupiterQuoteResponse;
+  status: number;
+  statusText: string;
+  headers: any;
+  config: any;
 }
 
 export interface SerializedQuoteResponse {
@@ -279,6 +352,12 @@ export interface NewTokenRecord {
   name: string;
   mint: string;
   creator: string;
+}
+
+export interface SwapTransactionResponse {
+  success: boolean;
+  msg: string | null;
+  tx: string | null;
 }
 
 export interface createSellTransactionResponse {

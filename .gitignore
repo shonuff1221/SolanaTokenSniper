@@ -23,6 +23,7 @@ yarn-error.log*
 .env*.local
 .env
 .todo
+telegram_session.txt
 
 # vercel
 .vercel
