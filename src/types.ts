@@ -103,13 +103,14 @@ export interface SerializedQuoteResponse {
 export interface RugResponseExtended {
   mint: string;
   tokenProgram: string;
-  creator: string;
+  creator?: string;
   token: {
     mintAuthority: string | null;
     supply: number;
     decimals: number;
     isInitialized: boolean;
     freezeAuthority: string | null;
+    createdAt: string;
   };
   token_extensions: unknown | null;
   tokenMeta: {
@@ -160,6 +161,7 @@ export interface RugResponseExtended {
   totalMarketLiquidity: number;
   totalLPProviders: number;
   rugged: boolean;
+  detectedAt: string;
 }
 
 export interface WebSocketRequest {

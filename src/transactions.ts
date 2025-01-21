@@ -150,6 +150,14 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
     const totalMarketLiquidity = tokenReport.totalMarketLiquidity;
     const isRugged = tokenReport.rugged;
     const rugScore = tokenReport.score;
+    const createdAt = new Date(tokenReport.detectedAt);
+    const tokenAgeMinutes = Math.round((Date.now() - createdAt.getTime()) / (1000 * 60));
+
+    if (config.rug_check.verbose_log) {
+      console.log("Token age:", tokenAgeMinutes, "minutes");
+      console.log("Created at:", createdAt.toISOString());
+    }
+
     const rugRisks = tokenReport.risks
       ? tokenReport.risks
       : [
@@ -225,7 +233,7 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
         message: "🚫 Not enough Market Liquidity.",
       },
       {
-        check: !rugCheckConfig.allow_rugged && isRugged, //true
+        check: !rugCheckConfig.allow_rugged && isRugged,
         message: "🚫 Token is rugged",
       },
       {
@@ -238,11 +246,15 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
       },
       {
         check: rugScore > rugCheckConfig.max_score && rugCheckConfig.max_score !== 0,
-        message: "🚫 Rug score to high.",
+        message: "🚫 Rug score too high.",
       },
       {
         check: rugRisks.some((risk) => rugCheckLegacy.includes(risk.name)),
         message: "🚫 Token has legacy risks that are not allowed.",
+      },
+      {
+        check: rugCheckConfig.max_token_age_minutes > 0 && tokenAgeMinutes > rugCheckConfig.max_token_age_minutes,
+        message: `🚫 Token is too old (${Math.round(tokenAgeMinutes)} minutes)`,
       },
     ];
 

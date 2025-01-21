@@ -12,7 +12,7 @@ export const config = {
   },
   tx: {
     fetch_tx_max_retries: 3,
-    fetch_tx_initial_delay: 3000, // Initial delay before fetching LP creation transaction details (3 seconds)
+    fetch_tx_initial_delay: 2000, // Initial delay before fetching LP creation transaction details (3 seconds)
     swap_tx_initial_delay: 1000, // Initial delay before first buy (1 second)
     get_timeout: 10000, // Timeout for API requests
     concurrent_transactions: 5, // Number of simultaneous transactions
@@ -53,7 +53,7 @@ export const config = {
     block_symbols: ["XXX"],
     block_names: ["XXX"],
     allow_insider_topholders: true, // Allow insider accounts to be part of the top holders
-    max_alowed_pct_topholders: 7, // Max allowed percentage an individual top holder might hold
+    max_alowed_pct_topholders: 10, // Max allowed percentage an individual top holder might hold
     exclude_lp_from_topholders: true, // If true, Liquidity Pools will not be seen as top holders
     // Warning
     min_total_markets: 1,
@@ -61,7 +61,8 @@ export const config = {
     min_total_market_Liquidity: 17000,
     // Misc
     ignore_pump_fun: false,
-    max_score: 11400, // Set to 0 to ignore
+    max_score: 11250, // Set to 0 to ignore
+    max_token_age_minutes: 90, // Maximum age of token in minutes, 0 to ignore
     legacy_not_allowed: [
       "Low Liquidity",
       "Single holder ownership",
