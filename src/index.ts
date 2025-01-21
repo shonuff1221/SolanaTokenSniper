@@ -83,12 +83,14 @@ async function processTransaction(signature: string): Promise<void> {
 
   try {
     // If token found and Telegram is enabled, send to group
-    if (config.telegram.enabled && config.telegram.group_id) {
-      await sendTokenToGroup(data.tokenMint, config.telegram.group_id);
-      console.log("✅ Token address sent to Telegram group successfully.");
+    if (config.telegram.enabled) {
+      console.log("🔄 Token passed rug check, sending to Telegram...");
+      await sendTokenToGroup(data.tokenMint);
+      console.log("✅ Token address sent to Telegram successfully.");
     }
   } catch (error) {
-    console.error("❌ Error processing transaction:", error);
+    console.error("❌ Error sending to Telegram:", error);
+    console.error("Full error:", error);
   }
 }
 

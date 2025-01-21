@@ -8,7 +8,6 @@ export const config = {
   },
   telegram: {
     enabled: true,
-    group_id: "", // Your Telegram group ID
     auto_buy: false, // If true, will also trigger buy when token is posted
   },
   tx: {
@@ -59,7 +58,7 @@ export const config = {
     // Warning
     min_total_markets: 1,
     min_total_lp_providers: 1,
-    min_total_market_Liquidity: 4000,
+    min_total_market_Liquidity: 17000,
     // Misc
     ignore_pump_fun: false,
     max_score: 11400, // Set to 0 to ignore

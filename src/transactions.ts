@@ -112,7 +112,7 @@ export async function fetchTransactionDetails(signature: string): Promise<MintsD
       retryCount++;
 
       if (retryCount < maxRetries) {
-        const delay = Math.min(4000 * Math.pow(1.5, retryCount), 15000);
+        const delay = Math.min(2000 * Math.pow(1.5, retryCount), 15000);
         console.log(`Waiting ${delay / 1000} seconds before next attempt...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
