@@ -11,12 +11,12 @@ export const config = {
     auto_buy: false, // If true, will also trigger buy when token is posted
   },
   tx: {
-    fetch_tx_max_retries: 3,
-    fetch_tx_initial_delay: 2000, // Initial delay before fetching LP creation transaction details (3 seconds)
-    swap_tx_initial_delay: 1000, // Initial delay before first buy (1 second)
-    get_timeout: 10000, // Timeout for API requests
-    concurrent_transactions: 10, // Number of simultaneous transactions
-    retry_delay: 500, // Delay between retries (0.5 seconds)
+    fetch_tx_max_retries: 5,          // Increased from 3 to 5
+    fetch_tx_initial_delay: 4000,     // Increased from 2000 to 4000
+    swap_tx_initial_delay: 1000,
+    get_timeout: 10000,
+    concurrent_transactions: 10,
+    retry_delay: 500,
   },
   swap: {
     verbose_log: true,
@@ -73,4 +73,24 @@ export const config = {
       // "Low amount of LP Providers",
     ],
   },
+  twitter_search: {
+    minimum_tweets: 4,           // Minimum number of tweets needed
+    minimum_unique_authors: 4,   // Minimum number of different authors needed
+    maximum_tweet_age_minutes: 15, // Maximum age of tweets to consider
+    excluded_users: [            // List of users to exclude from tweet counts
+      "pump_detector",
+      "BondedPump",
+      "rugpulldetector",
+      "tokensniffer",
+      "cryptoscamfinder",
+      "SolDeckBot",
+      "PumpFunScanner"
+    ],
+    matched_users: [           // List of important users - their tweets trigger immediate notification
+      "SOLBigBrain",
+      "SOLGems",
+      "SolanaFloor",
+      "SOLNewCoins"
+    ]
+  }
 };

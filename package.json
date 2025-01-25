@@ -10,9 +10,12 @@
     "tracker": "ts-node src/tracker/index.ts",
     "test": "ts-node src/test.ts",
     "clean": "rm -rf dist",
-    "scrape-twitter": "ts-node src/twitterScraper.ts",
+    "twitter-scan": "ts-node src/twitterPoolScan.ts",
+    "scrape-twitter": "ts-node src/NewPoolScan.ts",
     "test-browser": "ts-node src/testBrowser.ts",
-    "test-browserless": "ts-node src/testBrowserless.ts"
+    "local-login": "ts-node src/localLogin.ts",
+    "test-browserless": "ts-node src/testBrowserless.ts",
+    "search": "ts-node src/searchTokens.ts"
   },
   "keywords": [],
   "author": "https://x.com/shonuff1221",

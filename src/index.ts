@@ -1,15 +1,12 @@
 import WebSocket from "ws"; // Node.js websocket library
 import { WebSocketRequest } from "./types"; // Typescript Types for type safety
 import { config } from "./config"; // Configuration parameters for our bot
-import { fetchTransactionDetails, getRugCheckConfirmed } from "./transactions";
+import { fetchTransactionDetails, searchTwitterForToken } from "./NewPoolScan";
 import { validateEnv } from "./utils/env-validator";
 import { initTelegram, sendTokenToGroup } from "./telegram";
 
 // Define types
-interface TransactionData {
-  tokenMint: string;
-  solMint: string;
-}
+
 
 // Regional Variables
 let activeTransactions = 0;
@@ -27,6 +24,7 @@ function sendSubscribeRequest(ws: WebSocket): void {
       },
       {
         commitment: "processed", // Can use finalized to be more accurate.
+        encoding: "jsonParsed",
       },
     ],
   };
@@ -41,26 +39,22 @@ async function processTransaction(signature: string): Promise<void> {
   console.log(" Fetching transaction details ...");
 
   // Fetch the transaction details
-  const transactionData = await fetchTransactionDetails(signature);
-
-  if (!transactionData || !transactionData.tokenMint || !transactionData.solMint) {
-    console.log(" Transaction aborted. No data returned or missing required fields.");
-    console.log("✅ Resuming looking for new tokens...\n");
+  const data = await fetchTransactionDetails(signature);
+  if (!data) {
+    console.log("❌ Failed to fetch transaction details");
     return;
   }
 
-  const data: TransactionData = {
-    tokenMint: transactionData.tokenMint,
-    solMint: transactionData.solMint
-  };
-
-  // Check rug check
-  const isRugCheckPassed = await getRugCheckConfirmed(data.tokenMint);
-  if (!isRugCheckPassed) {
-    console.log(" Rug Check not passed! Transaction aborted.");
-    console.log("✅ Resuming looking for new tokens...\n");
+  console.log("🔍 Checking Twitter activity...");
+  const hasTwitterActivity = await searchTwitterForToken(data.tokenMint);
+  
+  if (!hasTwitterActivity) {
+    console.log("❌ Token failed Twitter activity check");
     return;
   }
+
+  console.log("✅ Token passed all checks!");
+
 
   // Check if token is from pump.fun
   if (data.tokenMint.trim().toLowerCase().endsWith("pump") && config.rug_check.ignore_pump_fun) {
@@ -118,49 +112,37 @@ async function websocketHandler(): Promise<void> {
   // Logic for the message event for the .on event listener
   ws.on("message", async (data: WebSocket.Data) => {
     try {
-      const jsonString = data.toString(); // Convert data to a string
-      const parsedData = JSON.parse(jsonString); // Parse the JSON string
+      const message = JSON.parse(data.toString());
+      
+      // Log the raw message for debugging
+      console.log("\nReceived WebSocket message:");
+      console.log(JSON.stringify(message, null, 2));
 
-      // Handle subscription response
-      if (parsedData.result !== undefined && !parsedData.error) {
-        console.log("✅ Subscription confirmed");
-        return;
+      // Check if it's an account notification
+      if (message.params?.result?.value?.account?.data) {
+        const signature = message.params.result.value.signature;
+        console.log("\n=============================================");
+        console.log(" New Liquidity Pool found.");
+        console.log(` Transaction Signature: ${signature}`);
+
+        // Verify if we have reached the max concurrent transactions
+        if (activeTransactions >= MAX_CONCURRENT) {
+          console.log(" Max concurrent transactions reached, skipping...");
+          return;
+        }
+
+        // Add additional concurrent transaction
+        activeTransactions++;
+
+        // Process transaction asynchronously
+        processTransaction(signature)
+          .catch((error) => {
+            console.error("Error processing transaction:", error);
+          })
+          .finally(() => {
+            activeTransactions--;
+          });
       }
-
-      // Only log RPC errors for debugging
-      if (parsedData.error) {
-        console.error(" RPC Error:", parsedData.error);
-        return;
-      }
-
-      // Safely access the nested structure
-      const logs = parsedData?.params?.result?.value?.logs;
-      const signature = parsedData?.params?.result?.value?.signature;
-
-      // Validate `logs` is an array and if we have a signtature
-      if (!Array.isArray(logs) || !signature) return;
-
-      // Verify if this is a new pool creation
-      const containsCreate = logs.some((log: string) => typeof log === "string" && log.includes("Program log: initialize2: InitializeInstruction2"));
-      if (!containsCreate || typeof signature !== "string") return;
-
-      // Verify if we have reached the max concurrent transactions
-      if (activeTransactions >= MAX_CONCURRENT) {
-        console.log(" Max concurrent transactions reached, skipping...");
-        return;
-      }
-
-      // Add additional concurrent transaction
-      activeTransactions++;
-
-      // Process transaction asynchronously
-      processTransaction(signature)
-        .catch((error) => {
-          console.error("Error processing transaction:", error);
-        })
-        .finally(() => {
-          activeTransactions--;
-        });
     } catch (error) {
       console.error(" Error processing message:", {
         error: error instanceof Error ? error.message : "Unknown error",
