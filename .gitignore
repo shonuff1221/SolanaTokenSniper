@@ -24,6 +24,7 @@ yarn-error.log*
 .env
 .todo
 telegram_session.txt
+x-cookies.json
 
 # vercel
 .vercel
@@ -35,3 +36,4 @@ next-env.d.ts
 # Project Personal Files
 holdings.db
 myConfig.ts
+/data

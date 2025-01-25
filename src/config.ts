@@ -74,8 +74,8 @@ export const config = {
     ],
   },
   twitter_search: {
-    minimum_tweets: 4,           // Minimum number of tweets needed
-    minimum_unique_authors: 4,   // Minimum number of different authors needed
+    minimum_tweets: 3,           // Minimum number of tweets needed
+    minimum_unique_authors: 3,   // Minimum number of different authors needed
     maximum_tweet_age_minutes: 15, // Maximum age of tweets to consider
     excluded_users: [            // List of users to exclude from tweet counts
       "pump_detector",
@@ -87,10 +87,10 @@ export const config = {
       "PumpFunScanner"
     ],
     matched_users: [           // List of important users - their tweets trigger immediate notification
-      "SOLBigBrain",
-      "SOLGems",
-      "SolanaFloor",
-      "SOLNewCoins"
+      "jxshujuxihu1",
+      "criptosonia_",
+      "mx_qh90936",
+      "DesireKeac21062"
     ]
   }
 };

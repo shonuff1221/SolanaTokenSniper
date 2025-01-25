@@ -188,7 +188,7 @@ class BrowserManager {
         }
     }
 
-    async searchToken(tokenAddress: string): Promise<void> {
+    async searchToken(tokenAddress: string): Promise<{ text: string; timestamp: string; author: string; }[] | null> {
         if (!this.browser || this.isClosing) {
             throw new Error('Browser is not initialized or is closing');
         }
@@ -200,31 +200,19 @@ class BrowserManager {
             console.log(`\nSearching X for token: ${tokenAddress}`);
             page = await this.navigateToTwitterSearch(tokenAddress);
 
-            // Wait for tweets with retry
-            let tweetsLoaded = false;
-            let retryCount = 0;
-            const maxRetries = 3;
-            const waitTime = 30000;
-
-            while (!tweetsLoaded && retryCount < maxRetries) {
-                try {
-                    await page.waitForSelector('article[data-testid="tweet"]', { timeout: waitTime });
-                    tweetsLoaded = true;
-                } catch {
-                    console.log(`Attempt ${retryCount + 1}/${maxRetries}: Waiting for tweets to load...`);
-                    retryCount++;
-                    if (retryCount === maxRetries) {
-                        throw new Error('Failed to load tweets after multiple attempts');
-                    }
-                    await delay(5000);
-                }
+            // Single attempt to find tweets
+            try {
+                await page.waitForSelector('article[data-testid="tweet"]', { timeout: 30000 });
+            } catch {
+                console.log('No tweets found for this token');
+                return null;
             }
 
             // Extract tweets
             const tweets = await page.$$eval('article[data-testid="tweet"]', (articles) => {
                 return articles.map(article => {
                     const timeElement = article.querySelector('time');
-                    const timestamp = timeElement ? timeElement.getAttribute('datetime') : '';
+                    const timestamp = timeElement?.getAttribute('datetime') || '';
                     const text = article.textContent || '';
                     
                     const userNameElement = article.querySelector('[data-testid="User-Name"]');
@@ -239,33 +227,14 @@ class BrowserManager {
 
                     return { text, timestamp, author };
                 });
-            });
+            }).then(tweets => tweets.filter(tweet => tweet.timestamp && tweet.author));
 
-            // Filter recent tweets
-            const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-            const recentTweets = tweets.filter(tweet => {
-                if (!tweet.timestamp) return false;
-                const tweetDate = new Date(tweet.timestamp);
-                return tweetDate > tenMinutesAgo;
-            });
-
-            // Save tweets to JSON file
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const outputFile = path.join(process.cwd(), 'data', `tweets-${tokenAddress}-${timestamp}.json`);
-            
-            // Ensure data directory exists
-            const dataDir = path.join(process.cwd(), 'data');
-            if (!fs.existsSync(dataDir)) {
-                fs.mkdirSync(dataDir, { recursive: true });
+            if (tweets.length === 0) {
+                console.log('No valid tweets found after parsing');
+                return null;
             }
 
-            fs.writeFileSync(outputFile, JSON.stringify({
-                tokenAddress,
-                searchTime: new Date().toISOString(),
-                timeWindow: '10 minutes',
-                tweetCount: recentTweets.length,
-                tweets: recentTweets
-            }, null, 2));
+            return tweets;
 
         } catch (error) {
             console.error('Error searching token:', error);

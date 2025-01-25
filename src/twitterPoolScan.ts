@@ -41,16 +41,6 @@ interface TransactionDetails {
   instructions: TransactionInstruction[];
 }
 
-interface Tweet {
-  author: string;
-  timestamp: string;
-  text: string;
-}
-
-interface TweetData {
-  tweets: Tweet[];
-}
-
 // Create a singleton browser manager
 let browserManager: BrowserManager | null = null;
 
@@ -179,34 +169,34 @@ async function searchTwitterForToken(tokenMint: string): Promise<boolean> {
     const manager = await getBrowserManager();
     
     console.log(`🔍 Searching Twitter for token: ${tokenMint}`);
-    await manager.searchToken(tokenMint);
+    const tweets = await manager.searchToken(tokenMint);
     
-    // Get the saved tweets from the most recent file
-    const dataDir = path.join(process.cwd(), 'data');
-    const files = fs.readdirSync(dataDir)
-      .filter(file => file.startsWith(`tweets-${tokenMint}`))
-      .sort()
-      .reverse();
-    
-    if (files.length === 0) {
+    if (!tweets || tweets.length === 0) {
       console.log('❌ No Twitter activity found for this token');
       return false;
     }
-    
-    const latestFile = path.join(dataDir, files[0]);
-    const tweetData = JSON.parse(fs.readFileSync(latestFile, 'utf8')) as TweetData;
-    
+
     // Analysis criteria from config
     const minimumTweets = config.twitter_search?.minimum_tweets || 2;
     const minimumUniqueAuthors = config.twitter_search?.minimum_unique_authors || 2;
     const maximumTweetAge = config.twitter_search?.maximum_tweet_age_minutes || 10;
-    const excludedUsers = config.twitter_search?.excluded_users || [];
-    const matchedUsers = config.twitter_search?.matched_users || [];
+    const excludedUsers = (config.twitter_search?.excluded_users || []).map(u => u.toLowerCase());
+    const matchedUsers = (config.twitter_search?.matched_users || []).map(u => u.toLowerCase());
+    
+    console.log('\n📊 Tweet Analysis:');
+    console.log('Found tweets from authors:', tweets.map(t => t.author).join(', '));
+    console.log('Excluded users:', excludedUsers.join(', '));
+    console.log('Watching for matched users:', matchedUsers.join(', '));
     
     // Filter out tweets from excluded users
-    const validTweets = tweetData.tweets.filter(tweet => 
-      !excludedUsers.includes(tweet.author.toLowerCase())
-    );
+    const validTweets = tweets.filter(tweet => {
+      const authorLower = tweet.author.toLowerCase();
+      const isExcluded = excludedUsers.includes(authorLower);
+      if (isExcluded) {
+        console.log(`🚫 Excluding tweet from: ${tweet.author}`);
+      }
+      return !isExcluded;
+    });
     
     // Check tweet age
     const now = new Date();
@@ -214,19 +204,31 @@ async function searchTwitterForToken(tokenMint: string): Promise<boolean> {
     
     const recentValidTweets = validTweets.filter(tweet => {
       const tweetTime = new Date(tweet.timestamp);
-      return tweetTime > oldestAllowedTime;
+      const isRecent = tweetTime > oldestAllowedTime;
+      if (!isRecent) {
+        console.log(`⏰ Tweet from ${tweet.author} is too old: ${new Date(tweet.timestamp).toLocaleString()}`);
+      }
+      return isRecent;
     });
 
     // Get unique authors (excluding excluded users)
     const uniqueAuthors = new Set(recentValidTweets.map(t => t.author.toLowerCase()));
     
     // Check for matched users and send notification if found
-    const matchedTweets = recentValidTweets.filter(tweet => 
-      matchedUsers.some(user => user.toLowerCase() === tweet.author.toLowerCase())
-    );
+    console.log('\n🔍 Checking for matched users...');
+    const matchedTweets = recentValidTweets.filter(tweet => {
+      const authorLower = tweet.author.toLowerCase();
+      const isMatched = matchedUsers.includes(authorLower);
+      console.log(`Checking ${tweet.author.toLowerCase()} against matched users...`);
+      if (isMatched) {
+        console.log(`✨ Found matched user tweet from: ${tweet.author}`);
+      }
+      return isMatched;
+    });
 
     if (matchedTweets.length > 0 && config.telegram.enabled) {
-      console.log(`🔥 Found tweets from ${matchedTweets.length} matched users!`);
+      console.log(`\n🔥 Found ${matchedTweets.length} tweets from matched users!`);
+      console.log('Matched tweets from:', matchedTweets.map(t => t.author).join(', '));
       
       // Create notification message
       const message = [
@@ -242,13 +244,16 @@ async function searchTwitterForToken(tokenMint: string): Promise<boolean> {
       ].join('\n');
 
       // Send to Telegram immediately
+      console.log('📱 Sending Telegram notification for matched users...');
       await sendTokenToGroup(message);
+      console.log('✅ Telegram notification sent!');
     }
     
     // Log analysis results
+    console.log(`\n📊 Analysis Results:`);
     console.log(`Found ${recentValidTweets.length} valid tweets from ${uniqueAuthors.size} unique authors`);
     if (excludedUsers.length > 0) {
-      console.log(`Excluded ${tweetData.tweets.length - validTweets.length} tweets from excluded users`);
+      console.log(`Excluded ${tweets.length - validTweets.length} tweets from excluded users`);
     }
     
     // Check minimum requirements
@@ -262,8 +267,29 @@ async function searchTwitterForToken(tokenMint: string): Promise<boolean> {
       return false;
     }
     
-    // Token passed all checks
+    // Token passed all checks - save the valid tweets
     console.log('✅ Token has sufficient Twitter activity!');
+    
+    // Save only the valid tweets that passed all checks
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const outputFile = path.join(process.cwd(), 'data', `tweets-${tokenMint}-${timestamp}.json`);
+    
+    // Ensure data directory exists
+    const dataDir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+
+    fs.writeFileSync(outputFile, JSON.stringify({
+      tokenAddress: tokenMint,
+      searchTime: new Date().toISOString(),
+      timeWindow: `${maximumTweetAge} minutes`,
+      tweetCount: recentValidTweets.length,
+      uniqueAuthors: Array.from(uniqueAuthors),
+      tweets: recentValidTweets
+    }, null, 2));
+    
+    console.log(`💾 Saved ${recentValidTweets.length} valid tweets to: ${path.basename(outputFile)}`);
     
     // Display tweet info
     recentValidTweets.forEach((tweet, index) => {
