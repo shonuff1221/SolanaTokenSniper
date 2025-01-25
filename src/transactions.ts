@@ -5,14 +5,14 @@ import dotenv from "dotenv";
 import { config } from "./config";
 import {
   TransactionDetailsResponseArray,
-  MintsDataReponse,
+  MintsDataResponse,
   RugResponseExtended,
 } from "./types";
 
 // Load environment variables from the .env file
 dotenv.config();
 
-export async function fetchTransactionDetails(signature: string): Promise<MintsDataReponse | null> {
+export async function fetchTransactionDetails(signature: string): Promise<MintsDataResponse | null> {
   // Set function constants
   const txUrl = process.env.HELIUS_HTTPS_URI_TX || "";
   const maxRetries = config.tx.fetch_tx_max_retries;
@@ -100,7 +100,7 @@ export async function fetchTransactionDetails(signature: string): Promise<MintsD
       console.log(`SOL Token Account: ${solTokenAccount}`);
       console.log(`New Token Account: ${newTokenAccount}`);
 
-      const displayData: MintsDataReponse = {
+      const displayData: MintsDataResponse = {
         tokenMint: newTokenAccount,
         solMint: solTokenAccount,
       };
@@ -218,19 +218,22 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
       },
       {
         check: topHolders.some((holder) => holder.pct > rugCheckConfig.max_alowed_pct_topholders),
-        message: "🚫 An individual top holder cannot hold more than the allowed percentage of the total supply",
+        message: () => {
+          const maxHolder = topHolders.reduce((max, holder) => holder.pct > max.pct ? holder : max);
+          return `🚫[${maxHolder.pct.toFixed(1)}%] An individual top holder cannot hold more than ${rugCheckConfig.max_alowed_pct_topholders}% of the total supply`;
+        },
       },
       {
         check: totalLPProviders < rugCheckConfig.min_total_lp_providers,
-        message: "🚫 Not enough LP Providers.",
+        message: `🚫[${totalLPProviders}] Not enough LP Providers (min: ${rugCheckConfig.min_total_lp_providers})`,
       },
       {
         check: marketsLength < rugCheckConfig.min_total_markets,
-        message: "🚫 Not enough Markets.",
+        message: `🚫[${marketsLength}] Not enough Markets (min: ${rugCheckConfig.min_total_markets})`,
       },
       {
         check: totalMarketLiquidity < rugCheckConfig.min_total_market_Liquidity,
-        message: "🚫 Not enough Market Liquidity.",
+        message: `🚫[$${Math.round(totalMarketLiquidity)}] Not enough Market Liquidity (min: $${rugCheckConfig.min_total_market_Liquidity})`,
       },
       {
         check: !rugCheckConfig.allow_rugged && isRugged,
@@ -246,22 +249,23 @@ export async function getRugCheckConfirmed(tokenMint: string): Promise<boolean> 
       },
       {
         check: rugScore > rugCheckConfig.max_score && rugCheckConfig.max_score !== 0,
-        message: "🚫 Rug score too high.",
+        message: `🚫[${rugScore}] Rug score too high (max: ${rugCheckConfig.max_score})`,
       },
       {
         check: rugRisks.some((risk) => rugCheckLegacy.includes(risk.name)),
-        message: "🚫 Token has legacy risks that are not allowed.",
+        message: "🚫 Token has legacy risks that are not allowed",
       },
       {
         check: rugCheckConfig.max_token_age_minutes > 0 && tokenAgeMinutes > rugCheckConfig.max_token_age_minutes,
-        message: `🚫 Token is too old (${Math.round(tokenAgeMinutes)} minutes)`,
+        message: `🚫[${tokenAgeMinutes}min] Token is too old (max: ${rugCheckConfig.max_token_age_minutes}min)`,
       },
     ];
 
     //Validate conditions
     for (const condition of conditions) {
       if (condition.check) {
-        console.log(condition.message);
+        const message = typeof condition.message === 'function' ? condition.message() : condition.message;
+        console.log(message);
         return false;
       }
     }

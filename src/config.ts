@@ -15,7 +15,7 @@ export const config = {
     fetch_tx_initial_delay: 2000, // Initial delay before fetching LP creation transaction details (3 seconds)
     swap_tx_initial_delay: 1000, // Initial delay before first buy (1 second)
     get_timeout: 10000, // Timeout for API requests
-    concurrent_transactions: 5, // Number of simultaneous transactions
+    concurrent_transactions: 10, // Number of simultaneous transactions
     retry_delay: 500, // Delay between retries (0.5 seconds)
   },
   swap: {
@@ -36,7 +36,7 @@ export const config = {
     auto_sell: false, // If set to true, stop loss and take profit triggers automatically when set.
     stop_loss_percent: 15,
     take_profit_percent: 50,
-    track_public_wallet: "4ayuKDn4bKjUs2McupF6b8b1SEW3frwkxfRkkaqSJehb", // If set an additional log line will be shown with a link to track your wallet
+    track_public_wallet: "FyTp8YSU8VtRAAsg3esa1r6mLpVzx5PF1Z4VZtVwnQKs", // If set an additional log line will be shown with a link to track your wallet
   },
   rug_check: {
     verbose_log: false,
@@ -53,15 +53,15 @@ export const config = {
     block_symbols: ["XXX"],
     block_names: ["XXX"],
     allow_insider_topholders: true, // Allow insider accounts to be part of the top holders
-    max_alowed_pct_topholders: 10, // Max allowed percentage an individual top holder might hold
+    max_alowed_pct_topholders: 5, // Max allowed percentage an individual top holder might hold
     exclude_lp_from_topholders: true, // If true, Liquidity Pools will not be seen as top holders
     // Warning
     min_total_markets: 1,
     min_total_lp_providers: 1,
-    min_total_market_Liquidity: 17000,
+    min_total_market_Liquidity: 35000,
     // Misc
     ignore_pump_fun: false,
-    max_score: 11250, // Set to 0 to ignore
+    max_score: 11400, // Set to 0 to ignore
     max_token_age_minutes: 90, // Maximum age of token in minutes, 0 to ignore
     legacy_not_allowed: [
       "Low Liquidity",

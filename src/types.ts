@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface MintsDataReponse {
+export interface MintsDataResponse {
   tokenMint: string;
   solMint: string;
 }
