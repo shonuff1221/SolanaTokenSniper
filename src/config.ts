@@ -86,14 +86,31 @@ export const config = {
       "tokensniffer",
       "cryptoscamfinder",
       "SolDeckBot",
-      "PumpFunScanner"
+      "PumpFunScanner",
+      "solmemescope",
+      "yutibot2",
+      "kuzkrypto",
+      "pumperius",
+      "secretdegens_",
+      "alexeya76698",
+      "testzentrumb",
+      "layzrd",
+      "ronaldosnapchat",
+      "cryptoclawws",
+      "alfred_ara59853",
+      "__aminamu_",
+      "__justbenneto_",
+      "___psalmsoleth_",
+      "owrcp38220"
     ],
     matched_users: [           // List of important users - their tweets trigger immediate notification
       "jxshujuxihu1",
       "criptosonia_",
       "mx_qh90936",
       "DesireKeac21062",
-      "nicoscalls"
+      "nicoscalls",      
+      "realgmarik",
+      "neim_on_x"
     ],
     blacklisted_users: [      // List of Twitter users whose tokens we don't want to buy
       "kolkerwesl51705",
