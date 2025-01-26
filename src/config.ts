@@ -11,12 +11,13 @@ export const config = {
     auto_buy: false, // If true, will also trigger buy when token is posted
   },
   tx: {
-    fetch_tx_max_retries: 5,          // Increased from 3 to 5
-    fetch_tx_initial_delay: 4000,     // Increased from 2000 to 4000
+    fetch_tx_max_retries: 3,          // Increased from 3 to 5
+    fetch_tx_initial_delay: 1000,     // Increased from 2000 to 4000
     swap_tx_initial_delay: 1000,
     get_timeout: 10000,
-    concurrent_transactions: 10,
-    retry_delay: 500,
+    concurrent_transactions: 1,
+    retry_delay: 1000,
+    max_retries: 3
   },
   swap: {
     verbose_log: true,
@@ -76,7 +77,8 @@ export const config = {
   twitter_search: {
     minimum_tweets: 3,           // Minimum number of tweets needed
     minimum_unique_authors: 3,   // Minimum number of different authors needed
-    maximum_tweet_age_minutes: 15, // Maximum age of tweets to consider
+    maximum_tweet_age_minutes: 30, // Maximum age of tweets to consider
+    max_token_age_minutes: 40,    // Maximum age of token to consider
     excluded_users: [            // List of users to exclude from tweet counts
       "pump_detector",
       "BondedPump",
@@ -90,7 +92,15 @@ export const config = {
       "jxshujuxihu1",
       "criptosonia_",
       "mx_qh90936",
-      "DesireKeac21062"
+      "DesireKeac21062",
+      "nicoscalls"
+    ],
+    blacklisted_users: [      // List of Twitter users whose tokens we don't want to buy
+      "kolkerwesl51705",
+      
     ]
+  },
+  helius: {
+    // Add your Helius configuration here
   }
 };

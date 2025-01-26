@@ -30,6 +30,7 @@ interface WebSocketRequest {
 interface MintsDataResponse {
   tokenMint: string;
   solMint: string;
+  timestamp: number;
 }
 
 interface TransactionInstruction {
@@ -39,6 +40,46 @@ interface TransactionInstruction {
 
 interface TransactionDetails {
   instructions: TransactionInstruction[];
+  blockTime?: number;
+}
+
+interface TopHolder {
+  address: string;
+  amount: number;
+  share: number;
+}
+
+interface Market {
+  address: string;
+  liquidity: number;
+  lpProviders: number;
+}
+
+interface RugResponseExtended {
+  token: {
+    mintAuthority: string;
+    freezeAuthority: string;
+    isInitialized: boolean;
+  };
+  tokenMeta: {
+    name: string;
+    symbol: string;
+    mutable: boolean;
+  };
+  detectedAt: string;
+  topHolders: TopHolder[];
+  markets: Market[];
+  totalLPProviders: number;
+  totalMarketLiquidity: number;
+  rugged: boolean;
+  score: number;
+  risks?: {
+    name: string;
+    value: string;
+    description: string;
+    score: number;
+    level: string;
+  }[];
 }
 
 // Create a singleton browser manager
@@ -50,6 +91,30 @@ async function getBrowserManager(): Promise<BrowserManager> {
     await browserManager.initialize();
   }
   return browserManager;
+}
+
+async function getTokenCreationTime(tokenMint: string): Promise<number | null> {
+  try {
+    // Wait briefly for token to be indexed
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const response = await axios.get<RugResponseExtended>(`https://api.rugcheck.xyz/v1/tokens/${tokenMint}/report`, {
+      timeout: config.tx.get_timeout
+    });
+
+    if (response.data && response.data.detectedAt) {
+      const createdAt = new Date(response.data.detectedAt);
+      return Math.floor(createdAt.getTime() / 1000);
+    }
+    return null;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('404')) {
+      console.log('Token not yet indexed on rugcheck, using current time');
+    } else {
+      console.error("Error fetching token creation time:", error);
+    }
+    return null;
+  }
 }
 
 async function fetchTransactionDetails(signature: string): Promise<MintsDataResponse | null> {
@@ -64,7 +129,7 @@ async function fetchTransactionDetails(signature: string): Promise<MintsDataResp
   let retryCount = 0;
 
   // Initial delay
-  const initialDelay = 4000;
+  const initialDelay = 2000;
   console.log(`⏳ Waiting for transaction confirmation...`);
   await new Promise((resolve) => setTimeout(resolve, initialDelay));
 
@@ -141,9 +206,15 @@ async function fetchTransactionDetails(signature: string): Promise<MintsDataResp
 
       console.log(`✅ Found new token: ${newTokenAccount}`);
 
+      // Get token creation time from rugcheck
+      const tokenTime = await getTokenCreationTime(newTokenAccount);
+      const currentTime = Math.floor(Date.now() / 1000);
+      const timestamp = tokenTime || currentTime;
+
       return {
         tokenMint: newTokenAccount,
         solMint: solTokenAccount,
+        timestamp: timestamp
       };
     } catch (error) {
       if (error instanceof Error) {
@@ -153,7 +224,7 @@ async function fetchTransactionDetails(signature: string): Promise<MintsDataResp
       retryCount++;
 
       if (retryCount < maxRetries) {
-        const delay = Math.min(4000 * Math.pow(1.5, retryCount), 20000);
+        const delay = Math.min(2000 * Math.pow(1.5, retryCount), 20000);
         console.log(`⏳ Retrying in ${Math.round(delay / 1000)}s...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
@@ -182,11 +253,23 @@ async function searchTwitterForToken(tokenMint: string): Promise<boolean> {
     const maximumTweetAge = config.twitter_search?.maximum_tweet_age_minutes || 10;
     const excludedUsers = (config.twitter_search?.excluded_users || []).map(u => u.toLowerCase());
     const matchedUsers = (config.twitter_search?.matched_users || []).map(u => u.toLowerCase());
+    const blacklistedUsers = (config.twitter_search?.blacklisted_users || []).map(u => u.toLowerCase());
     
     console.log('\n📊 Tweet Analysis:');
     console.log('Found tweets from authors:', tweets.map(t => t.author).join(', '));
     console.log('Excluded users:', excludedUsers.join(', '));
     console.log('Watching for matched users:', matchedUsers.join(', '));
+    
+    // Check for blacklisted users first
+    const blacklistedTweets = tweets.filter(tweet => 
+      blacklistedUsers.includes(tweet.author.toLowerCase())
+    );
+
+    if (blacklistedTweets.length > 0) {
+      console.log(`🚫 Found tweets from blacklisted users: ${blacklistedTweets.map(t => t.author).join(', ')}`);
+      console.log('Skipping this token for safety.');
+      return false;
+    }
     
     // Filter out tweets from excluded users
     const validTweets = tweets.filter(tweet => {
@@ -291,13 +374,13 @@ async function searchTwitterForToken(tokenMint: string): Promise<boolean> {
     
     console.log(`💾 Saved ${recentValidTweets.length} valid tweets to: ${path.basename(outputFile)}`);
     
-    // Display tweet info
-    recentValidTweets.forEach((tweet, index) => {
-      console.log(`\nTweet ${index + 1}:`);
-      console.log(`Author: @${tweet.author}`);
-      console.log(`Time: ${new Date(tweet.timestamp).toLocaleString()}`);
-      console.log(`Content: ${tweet.text.slice(0, 100)}...`);
-    });
+    // // Display tweet info
+    // recentValidTweets.forEach((tweet, index) => {
+    //   console.log(`\nTweet ${index + 1}:`);
+    //   console.log(`Author: @${tweet.author}`);
+    //   console.log(`Time: ${new Date(tweet.timestamp).toLocaleString()}`);
+    //   console.log(`Content: ${tweet.text.slice(0, 100)}...`);
+    // });
     
     return true;
     
@@ -330,41 +413,54 @@ function sendSubscribeRequest(ws: WebSocket): void {
 
 // Function to process a transaction
 async function processTransaction(signature: string): Promise<void> {
-  // Output logs
-  console.log("=============================================");
-  console.log("🔎 New Liquidity Pool found.");
-  console.log("🔃 Fetching transaction details ...");
+  try {
+    console.log("⏳ Waiting for transaction confirmation...");
+    const txInfo = await fetchTransactionDetails(signature);
 
-  // Fetch the transaction details
-  const data = await fetchTransactionDetails(signature);
-  if (!data) {
-    console.log("⛔ Transaction aborted. No data returned.");
-    console.log("🟢 Resuming looking for new tokens...\n");
-    return;
-  }
+    if (!txInfo) {
+      console.log("❌ Could not fetch transaction info");
+      return;
+    }
 
-  console.log("🔍 Checking Twitter activity...");
-  const hasTwitterActivity = await searchTwitterForToken(data.tokenMint);
-  
-  if (!hasTwitterActivity) {
-    console.log("🚫 No Twitter activity found! Transaction aborted.");
-    console.log("🟢 Resuming looking for new tokens...\n");
-    return;
-  }
+    const { tokenMint, timestamp } = txInfo;
+    
+    // Check if token is too old using config value
+    const now = Math.floor(Date.now() / 1000);
+    const minutesOld = (now - timestamp) / 60;
+    const maxAge = config.twitter_search?.max_token_age_minutes || 40;
+    
+    if (minutesOld > maxAge) {
+      console.log(`❌ Token is ${Math.round(minutesOld)} minutes old. Skipping tokens older than ${maxAge} minutes.`);
+      return;
+    }
 
-  // Output logs
-  console.log("Token found");
-  console.log("👽 GMGN: https://gmgn.ai/sol/token/" + data.tokenMint);
-  console.log("😈 BullX: https://neo.bullx.io/terminal?chainId=1399811149&address=" + data.tokenMint);
+    console.log(`✅ Found new token: ${tokenMint} (${Math.round(minutesOld)} minutes old)`);
+    console.log("🔍 Checking Twitter activity...");
 
-  // Send token to group if telegram is enabled
-  if (config.telegram.enabled) {
-    console.log("🔄 Token passed checks, sending to Telegram...");
-    await sendTokenToGroup(data.tokenMint);
-    console.log("✅ Token address sent to Telegram successfully.");
-    console.log("🟢 Resuming looking for new tokens...\n");
+    const hasTwitterActivity = await searchTwitterForToken(tokenMint);
+
+    if (!hasTwitterActivity) {
+      console.log("🚫 No Twitter activity found! Transaction aborted.");
+      return;
+    }
+
+    // Output logs
+    console.log("Token found");
+    console.log("👽 GMGN: https://gmgn.ai/sol/token/" + tokenMint);
+    console.log("😈 BullX: https://neo.bullx.io/terminal?chainId=1399811149&address=" + tokenMint);
+
+    // Send token to group if telegram is enabled
+    if (config.telegram.enabled) {
+      console.log("🔄 Token passed checks, sending to Telegram...");
+      await sendTokenToGroup(tokenMint);
+      console.log("✅ Token address sent to Telegram successfully.");
+      console.log("🟢 Resuming looking for new tokens...\n");
+    }
+  } catch (error) {
+    console.error("Error processing transaction:", error);
   }
 }
+
 
 // Main function to start the WebSocket connection
 let init = false;
