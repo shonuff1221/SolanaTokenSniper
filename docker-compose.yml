@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   webhook-receiver:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     command: npm run start:webhook
     ports:
       - "${WEBHOOK_PORT:-3000}:3000"

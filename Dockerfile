@@ -10,11 +10,12 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy source code
-COPY . .
+# Copy source code and config files
+COPY tsconfig.webhook.json ./
+COPY src ./src
 
-# Build TypeScript code
-RUN npm run build
+# Build TypeScript code using webhook config
+RUN npx tsc -p tsconfig.webhook.json
 
 # Set environment variables
 ENV NODE_ENV=production
@@ -23,4 +24,4 @@ ENV NODE_ENV=production
 EXPOSE 3000
 
 # Start the webhook receiver
-CMD ["npm", "run", "start:webhook"]
+CMD ["node", "dist/webhookReceiver.js"]

@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "target": "es2020",
+        "module": "commonjs",
+        "lib": ["es2020"],
+        "declaration": true,
+        "strict": true,
+        "noImplicitAny": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "outDir": "./dist",
+        "rootDir": "./src"
+    },
+    "include": [
+        "src/webhookReceiver.ts",
+        "src/config.ts",
+        "src/telegram.ts",
+        "src/utils/env-validator.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "**/*.test.ts"
+    ]
+}

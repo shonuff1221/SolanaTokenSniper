@@ -4,6 +4,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "build:webhook": "tsc -p tsconfig.webhook.json",
     "start": "node dist/index.js",
     "start:tracker": "node dist/tracker/index.js",
     "dev": "ts-node src/index.ts",
