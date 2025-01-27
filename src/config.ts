@@ -1,4 +1,10 @@
 export const config = {
+  webhook: {
+    enabled: true,
+    port: 3000,
+    endpoint: '/webhook',
+    token_regex: /[1-9A-HJ-NP-Za-km-z]{32,44}/g,  // Regex for finding Solana token addresses
+  },
   liquidity_pool: {
     radiyum_program_id: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
     wsol_pc_mint: "So11111111111111111111111111111111111111112",

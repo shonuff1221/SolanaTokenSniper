@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  webhook-receiver:
+    build: .
+    command: npm run start:webhook
+    ports:
+      - "${WEBHOOK_PORT:-3000}:3000"
+    volumes:
+      - ./src/config:/app/src/config
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env
+    restart: unless-stopped
+
+volumes:
+  config:
+  data:

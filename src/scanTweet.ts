@@ -121,6 +121,14 @@ async function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Function to delay with exponential backoff
+async function delayWithBackoff(retryCount: number): Promise<void> {
+    const baseDelay = 2000; // 2 seconds base
+    const maxDelay = 30000; // 30 seconds max
+    const delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
+    await new Promise(resolve => setTimeout(resolve, delay));
+}
+
 // Function to login to Twitter
 async function loginToTwitter(page: Page): Promise<boolean> {
     try {
@@ -245,6 +253,7 @@ class BrowserManager {
     private browser: Browser | null = null;
     private isClosing: boolean = false;
     private lastScannedTweets: Map<string, string> = new Map(); // Store last seen tweet IDs
+    private accountPages: Map<string, Page> = new Map(); // Store open tabs for each account
 
     async initialize(): Promise<void> {
         if (this.browser) return;
@@ -256,9 +265,157 @@ class BrowserManager {
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
             console.log('✅ Browser initialized');
+
+            // Initialize tabs for all accounts
+            const monitoredAccounts = loadTwitterAccounts();
+            for (const account of monitoredAccounts) {
+                const page = await this.browser.newPage();
+                await loadCookies(page);
+                this.accountPages.set(account, page);
+                console.log(`📱 Opened tab for @${account}`);
+            }
         } catch (error) {
             console.error('❌ Failed to initialize browser:', error);
             throw error;
+        }
+    }
+
+    async close(): Promise<void> {
+        if (this.isClosing) return;
+
+        this.isClosing = true;
+        console.log('Closing browser manager...');
+        
+        // Close all account pages
+        for (const [account, page] of this.accountPages) {
+            try {
+                await page.close();
+                console.log(`📴 Closed tab for @${account}`);
+            } catch (error) {
+                console.error(`❌ Error closing tab for @${account}:`, error);
+            }
+        }
+        this.accountPages.clear();
+
+        if (this.browser) {
+            await this.browser.close();
+            this.browser = null;
+        }
+        
+        this.isClosing = false;
+    }
+
+    async scanAccountTweets(): Promise<void> {
+        if (!this.browser) {
+            await this.initialize();
+        }
+
+        try {
+            const monitoredAccounts = loadTwitterAccounts();
+            console.log(`🔄 Starting scan for ${monitoredAccounts.length} accounts...`);
+
+            // Scan all accounts in parallel
+            await Promise.all(monitoredAccounts.map(async (account) => {
+                let retryCount = 0;
+                const maxRetries = 3;
+
+                // Get or create page for this account
+                let page = this.accountPages.get(account);
+                if (!page) {
+                    page = await this.browser!.newPage();
+                    await loadCookies(page);
+                    this.accountPages.set(account, page);
+                    console.log(`📱 Created new tab for @${account}`);
+                }
+
+                while (retryCount < maxRetries) {
+                    try {
+                        await page.goto(`https://twitter.com/${account}`, {
+                            waitUntil: 'networkidle2',
+                            timeout: 30000
+                        });
+
+                        // Add small random delay
+                        await delay(1000 + Math.random() * 1000);
+
+                        // Check for rate limit indicators
+                        const rateLimitSelector = 'div[data-testid="empty_state_header_text"]';
+                        const isRateLimited = await page.$(rateLimitSelector).then(el => !!el);
+
+                        if (isRateLimited) {
+                            console.log(`⚠️ Rate limit detected for @${account}, will retry after delay...`);
+                            await delayWithBackoff(retryCount);
+                            retryCount++;
+                            continue;
+                        }
+
+                        // Wait for tweets to load
+                        const tweetSelector = 'article[data-testid="tweet"]';
+                        await page.waitForSelector(tweetSelector, { timeout: 30000 });
+
+                        // Get tweets
+                        const tweets = await page.$$eval(tweetSelector, (elements) => {
+                            return elements.slice(0, 5).map((tweet) => {
+                                const textElement = tweet.querySelector('[data-testid="tweetText"]');
+                                const timestampElement = tweet.querySelector('time');
+                                const tweetId = tweet.getAttribute('data-tweet-id');
+                                const tweetUrl = tweet.querySelector('a[href*="/status/"]')?.getAttribute('href') || '';
+                                
+                                return {
+                                    text: textElement ? textElement.textContent : '',
+                                    timestamp: timestampElement ? timestampElement.getAttribute('datetime') : '',
+                                    id: tweetId || '',
+                                    url: tweetUrl
+                                };
+                            });
+                        });
+
+                        // Process each tweet
+                        for (const tweet of tweets) {
+                            if (!this.lastScannedTweets.has(tweet.id) && tweet.text) {
+                                const tokenMatches = tweet.text.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/g);
+                                
+                                if (tokenMatches) {
+                                    for (const tokenAddress of tokenMatches) {
+                                        if (!isTokenFound(tokenAddress)) {
+                                            console.log(`💎 Found new token address in tweet from @${account}: ${tokenAddress}`);
+                                            const tweetUrl = `https://twitter.com${tweet.url}`;
+                                            saveFoundToken(tokenAddress, tweetUrl, account);
+                                            await sendTokenToGroup(tokenAddress);
+                                        }
+                                    }
+                                }
+
+                                this.lastScannedTweets.set(tweet.id, tweet.timestamp || '');
+                            }
+                        }
+
+                        break;
+
+                    } catch (error) {
+                        console.error(`❌ Error scanning tweets from @${account} (attempt ${retryCount + 1}/${maxRetries}):`, error);
+                        
+                        if (!page.isClosed()) {
+                            try {
+                                await page.reload({ waitUntil: 'networkidle2', timeout: 30000 });
+                            } catch {
+                                page = await this.browser!.newPage();
+                                await loadCookies(page);
+                                this.accountPages.set(account, page);
+                                console.log(`📱 Created new tab for @${account} after error`);
+                            }
+                        }
+                        
+                        await delayWithBackoff(retryCount);
+                        retryCount++;
+                    }
+                }
+            }));
+
+            console.log('✅ Completed scanning all accounts');
+
+        } catch (error) {
+            console.error('❌ Error in scanAccountTweets:', error);
         }
     }
 
@@ -389,103 +546,6 @@ class BrowserManager {
         
         throw new Error('Navigation failed after all retries');
     }
-
-    async scanAccountTweets(): Promise<void> {
-        if (!this.browser) {
-            await this.initialize();
-        }
-
-        try {
-            const page = await this.browser!.newPage();
-            await loadCookies(page);
-
-            const monitoredAccounts = loadTwitterAccounts();
-
-            for (const account of monitoredAccounts) {
-                console.log(`Scanning tweets from @${account}...`);
-                
-                try {
-                    await page.goto(`https://twitter.com/${account}`, {
-                        waitUntil: 'networkidle2',
-                        timeout: 60000
-                    });
-                    await delay(3000);
-
-                    // Wait for tweets to load
-                    const tweetSelector = 'article[data-testid="tweet"]';
-                    await page.waitForSelector(tweetSelector, { timeout: 20000 });
-
-                    // Get tweets
-                    const tweets = await page.$$eval(tweetSelector, (elements) => {
-                        return elements.slice(0, 5).map((tweet) => {
-                            const textElement = tweet.querySelector('[data-testid="tweetText"]');
-                            const timestampElement = tweet.querySelector('time');
-                            const tweetId = tweet.getAttribute('data-tweet-id');
-                            const tweetUrl = tweet.querySelector('a[href*="/status/"]')?.getAttribute('href') || '';
-                            
-                            return {
-                                text: textElement ? textElement.textContent : '',
-                                timestamp: timestampElement ? timestampElement.getAttribute('datetime') : '',
-                                id: tweetId || '',
-                                url: tweetUrl
-                            };
-                        });
-                    });
-
-                    // Process each tweet
-                    for (const tweet of tweets) {
-                        if (!this.lastScannedTweets.has(tweet.id) && tweet.text) {
-                            // Check for Solana token addresses (base58 format, typically 32-44 chars)
-                            const tokenMatches = tweet.text.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/g);
-                            
-                            if (tokenMatches) {
-                                for (const tokenAddress of tokenMatches) {
-                                    // Check if we've already found this token
-                                    if (!isTokenFound(tokenAddress)) {
-                                        console.log(`Found new token address in tweet from @${account}: ${tokenAddress}`);
-                                        const tweetUrl = `https://twitter.com${tweet.url}`;
-                                        
-                                        // Save the token before sending to avoid duplicates even if sending fails
-                                        saveFoundToken(tokenAddress, tweetUrl, account);
-                                        
-                                        // Send to telegram
-                                        await sendTokenToGroup(tokenAddress);
-                                    } else {
-                                        console.log(`Skipping previously found token: ${tokenAddress}`);
-                                    }
-                                }
-                            }
-
-                            this.lastScannedTweets.set(tweet.id, tweet.timestamp || '');
-                        }
-                    }
-
-                } catch (error) {
-                    console.error(`Error scanning tweets from @${account}:`, error);
-                }
-
-                await delay(2000); // Wait between scanning different accounts
-            }
-
-            await page.close();
-        } catch (error) {
-            console.error('Error in scanAccountTweets:', error);
-        }
-    }
-
-    async close(): Promise<void> {
-        if (this.isClosing) return;
-
-        this.isClosing = true;
-        console.log('Closing browser manager...');
-        
-        if (this.browser) {
-            await this.browser.close();
-            this.browser = null;
-        }
-        
-        this.isClosing = false;
-    }
 }
 
 // Function to load main config
@@ -516,33 +576,32 @@ function loadConfig(): Config {
     }
 }
 
-// Modified main function to initialize Telegram
+// Modified main function
 async function main() {
     const manager = new BrowserManager();
     const config = loadConfig();
     
     try {
-        // Initialize Telegram if enabled
         if (config.telegram.enabled) {
-            console.log('Initializing Telegram...');
+            console.log('🔄 Initializing Telegram...');
             await initTelegram();
-            console.log('Telegram initialized');
+            console.log('✅ Telegram initialized');
         } else {
-            console.log('Telegram notifications are disabled');
+            console.log('⚠️ Telegram notifications are disabled');
         }
 
         await manager.initialize();
         
-        // Scan tweets every 15 seconds
+        // Scan tweets every 15 seconds, but only one account at a time
         const scanInterval = 15 * 1000;
         
         while (true) {
             await manager.scanAccountTweets();
-            console.log(`Waiting ${scanInterval/1000} seconds before next scan...`);
+            console.log(`⏳ Waiting ${scanInterval/1000} seconds before next scan...`);
             await delay(scanInterval);
         }
     } catch (error) {
-        console.error('Error in main:', error);
+        console.error('❌ Error in main:', error);
         await manager.close();
     }
 }
