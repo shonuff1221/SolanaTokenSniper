@@ -1,4 +1,5 @@
 import express from 'express';
+import bodyParser from 'body-parser';
 import { config } from './config';
 import { initTelegram, sendTokenToGroup } from './telegram';
 import { validateEnv } from "./utils/env-validator";
@@ -13,7 +14,10 @@ dotenv.config();
 validateEnv();
 
 const app = express();
-app.use(express.text());
+
+// Configure body parser for text content
+app.use(bodyParser.text({ type: 'text/plain' }));
+app.use(bodyParser.json({ type: 'application/json' })); // Fallback for JSON
 
 interface WebhookData {
     Text: string;
@@ -71,16 +75,38 @@ function saveFoundToken(tokenAddress: string, webhookData: WebhookData): void {
 }
 
 // Function to parse webhook body
-function parseWebhookBody(body: string): WebhookData {
-    const textMatch = body.match(/{{Text}}(.*?)(?={{|$)/s);
-    const userNameMatch = body.match(/{{UserName}}(.*?)(?={{|$)/s);
-    const createdAtMatch = body.match(/{{CreatedAt}}(.*?)(?={{|$)/s);
+function parseWebhookBody(body: string | WebhookData): WebhookData {
+    console.log('Received body:', body);
+    
+    try {
+        // Try parsing as JSON first
+        if (typeof body === 'object') {
+            const data = body as WebhookData;
+            return {
+                Text: data.Text || '',
+                UserName: data.UserName || '',
+                CreatedAt: data.CreatedAt || new Date().toISOString()
+            };
+        }
 
-    return {
-        Text: textMatch?.[1]?.trim() || '',
-        UserName: userNameMatch?.[1]?.trim() || '',
-        CreatedAt: createdAtMatch?.[1]?.trim() || new Date().toISOString()
-    };
+        // Parse as text with template tags
+        const textMatch = body.toString().match(/{{Text}}(.*?)(?={{|$)/s);
+        const userNameMatch = body.toString().match(/{{UserName}}(.*?)(?={{|$)/s);
+        const createdAtMatch = body.toString().match(/{{CreatedAt}}(.*?)(?={{|$)/s);
+
+        return {
+            Text: textMatch?.[1]?.trim() || '',
+            UserName: userNameMatch?.[1]?.trim() || '',
+            CreatedAt: createdAtMatch?.[1]?.trim() || new Date().toISOString()
+        };
+    } catch (error) {
+        console.error('Error parsing webhook body:', error);
+        return {
+            Text: body.toString(),
+            UserName: 'unknown',
+            CreatedAt: new Date().toISOString()
+        };
+    }
 }
 
 // Function to extract token addresses from text
@@ -91,6 +117,8 @@ function extractTokenAddresses(text: string): string[] {
 // Webhook endpoint to receive notifications
 app.post(config.webhook.endpoint, async (req, res) => {
     try {
+        console.log('Received request with content-type:', req.headers['content-type']);
+        
         // Parse the webhook body
         const webhookData = parseWebhookBody(req.body);
         console.log(`📥 Received webhook from @${webhookData.UserName}`);
