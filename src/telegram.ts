@@ -115,11 +115,14 @@ export async function sendMessage(username: string, message: string) {
     }
 }
 
-export async function sendTokenToGroup(tokenAddress: string, username?: string) {
+export async function sendTokenToGroup(tokenAddress: string) {
     try {
         if (!client) {
             throw new Error("Telegram client not initialized");
         }
+
+        // Hardcoded username
+        const targetUsername = "achilles_trojanbot";
 
         // Format the message with token links
         const message = `🚨 New Token Found! 🚨\n\n` +
@@ -128,31 +131,19 @@ export async function sendTokenToGroup(tokenAddress: string, username?: string) 
             `• [GMGN](https://gmgn.ai/sol/token/${tokenAddress})\n` +
             `• [BullX](https://neo.bullx.io/terminal?chainId=1399811149&address=${tokenAddress})\n` +
             `• [Solscan](https://solscan.io/token/${tokenAddress})\n\n` +
-            `⚡️ Trade on:\n` +
-            `• [Raydium](https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${tokenAddress})\n` +
-            `• [Jupiter](https://jup.ag/swap/SOL-${tokenAddress})`;
+            '@Shonuff - Token Sniper\n\n' +
+            '```\n' +
+            `${tokenAddress}\n` +
+            '```\n';
 
-        if (username) {
-            // If username is provided, send to that user
-            const peer = await findUserByUsername(username);
-            await client.sendMessage(peer, {
-                message,
-                parseMode: 'markdown',
-                linkPreview: false
-            });
-            console.log(`✅ Token sent to user @${username} successfully`);
-        } else {
-            // Otherwise try to send to group
-            if (!process.env.TELEGRAM_GROUP_ID) {
-                throw new Error("TELEGRAM_GROUP_ID not set in environment variables");
-            }
-            await client.sendMessage(process.env.TELEGRAM_GROUP_ID, {
-                message,
-                parseMode: 'markdown',
-                linkPreview: false
-            });
-            console.log("✅ Token sent to group successfully");
-        }
+        // If username is provided, send to that user
+        const peer = await findUserByUsername(targetUsername);
+        await client.sendMessage(peer, {
+            message,
+            parseMode: 'markdown',
+            linkPreview: false
+        });
+        console.log(`✅ Token sent to user @${targetUsername} successfully`);
     } catch (error) {
         console.error("❌ Error sending token to group:", error);
         throw error;
