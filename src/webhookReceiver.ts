@@ -15,9 +15,15 @@ validateEnv();
 
 const app = express();
 
-// Configure body parser for text content
-app.use(bodyParser.text({ type: 'text/plain' }));
-app.use(bodyParser.json({ type: 'application/json' })); // Fallback for JSON
+// Configure body parser for content types
+app.use((req, res, next) => {
+    const contentType = req.headers['content-type'] || '';
+    if (contentType.includes('application/json')) {
+        bodyParser.json()(req, res, next);
+    } else {
+        bodyParser.text({ type: '*/*' })(req, res, next);
+    }
+});
 
 interface WebhookData {
     Text: string;
@@ -79,7 +85,22 @@ function parseWebhookBody(body: string | WebhookData): WebhookData {
     console.log('Received body:', body);
     
     try {
-        // Try parsing as JSON first
+        // Try parsing as JSON first if body is a string that looks like JSON
+        if (typeof body === 'string' && body.trim().startsWith('{')) {
+            try {
+                const jsonData = JSON.parse(body) as WebhookData;
+                return {
+                    Text: jsonData.Text || '',
+                    UserName: jsonData.UserName || '',
+                    CreatedAt: jsonData.CreatedAt || new Date().toISOString()
+                };
+            } catch (error) {
+                // Not valid JSON, continue with template parsing
+                return error instanceof Error ? error : JSON.parse(body.toString());
+            }
+        }
+
+        // If body is already an object
         if (typeof body === 'object') {
             const data = body as WebhookData;
             return {
@@ -90,9 +111,14 @@ function parseWebhookBody(body: string | WebhookData): WebhookData {
         }
 
         // Parse as text with template tags
-        const textMatch = body.toString().match(/{{Text}}(.*?)(?={{|$)/s);
-        const userNameMatch = body.toString().match(/{{UserName}}(.*?)(?={{|$)/s);
-        const createdAtMatch = body.toString().match(/{{CreatedAt}}(.*?)(?={{|$)/s);
+        const bodyStr = body.toString();
+        console.log('Parsing template tags from:', bodyStr);
+        
+        const textMatch = bodyStr.match(/{{Text}}(.*?)(?={{|$)/s);
+        const userNameMatch = bodyStr.match(/{{UserName}}(.*?)(?={{|$)/s);
+        const createdAtMatch = bodyStr.match(/{{CreatedAt}}(.*?)(?={{|$)/s);
+
+        console.log('Matches:', { textMatch, userNameMatch, createdAtMatch });
 
         return {
             Text: textMatch?.[1]?.trim() || '',
@@ -102,7 +128,7 @@ function parseWebhookBody(body: string | WebhookData): WebhookData {
     } catch (error) {
         console.error('Error parsing webhook body:', error);
         return {
-            Text: body.toString(),
+            Text: typeof body === 'string' ? body : JSON.stringify(body),
             UserName: 'unknown',
             CreatedAt: new Date().toISOString()
         };
@@ -121,8 +147,7 @@ app.post(config.webhook.endpoint, async (req, res) => {
         
         // Parse the webhook body
         const webhookData = parseWebhookBody(req.body);
-        console.log(`📥 Received webhook from @${webhookData.UserName}`);
-        console.log(`💬 Tweet: ${webhookData.Text}`);
+        console.log(`📥 Received webhook data:`, webhookData);
 
         // Extract token addresses from the tweet text
         const tokenAddresses = extractTokenAddresses(webhookData.Text);
