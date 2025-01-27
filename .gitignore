@@ -37,3 +37,5 @@ next-env.d.ts
 holdings.db
 myConfig.ts
 /data
+x-cookies.json
+src/config
