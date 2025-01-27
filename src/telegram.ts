@@ -3,16 +3,15 @@ import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { Api } from "telegram/tl";
 import dotenv from "dotenv";
+// import fs from 'fs';
+// import path from 'path';
+// import bigInt from "big-integer";
 
 dotenv.config();
 
 const apiId = parseInt(process.env.TELEGRAM_API_ID || "0");
 const apiHash = process.env.TELEGRAM_API_HASH || "";
-
-// Handle potential URL-encoded session string from environment
-const rawSession = process.env.TELEGRAM_STRING_SESSION || "";
-const decodedSession = decodeURIComponent(rawSession.replace(/\\n/g, '\n'));
-const stringSession = new StringSession(decodedSession);
+const stringSession = new StringSession(process.env.TELEGRAM_STRING_SESSION || "");
 
 let client: TelegramClient | null = null;
 
@@ -54,16 +53,8 @@ export async function initTelegram() {
         process.exit(1);
     }
 
-    if (!process.env.TELEGRAM_USERNAME) {
-        console.error("❌ Missing TELEGRAM_USERNAME in .env file");
-        console.error("Please set TELEGRAM_USERNAME to specify where to send messages");
-        process.exit(1);
-    }
-
     try {
         console.log("🔄 Initializing Telegram client...");
-        console.log("Debug: Session string length:", decodedSession.length);
-        
         client = new TelegramClient(stringSession, apiId, apiHash, {
             connectionRetries: 5,
             useWSS: true,
@@ -81,18 +72,8 @@ export async function initTelegram() {
             console.log("✅ Logged in as:", (me as Api.User).username);
         }
 
-        // Verify target user exists
-        const targetUser = await findUserByUsername(process.env.TELEGRAM_USERNAME);
-        if (targetUser) {
-            console.log("✅ Target user found:", process.env.TELEGRAM_USERNAME);
-        }
-
     } catch (error: any) {
         console.error("❌ Failed to connect to Telegram:", error.message);
-        if (error.message.includes('session invalid')) {
-            console.error("Session string might be malformed. Current session string:", 
-                decodedSession.substring(0, 10) + "..." + decodedSession.substring(decodedSession.length - 10));
-        }
         throw error;
     }
 }
@@ -126,12 +107,8 @@ export async function sendMessage(username: string, message: string) {
         }
 
         const peer = await findUserByUsername(username);
-        await client.sendMessage(peer, { 
-            message,
-            parseMode: 'markdown',
-            linkPreview: false
-        });
-        console.log("✅ Message sent successfully to", username);
+        await client.sendMessage(peer, { message });
+        console.log("✅ Message sent successfully");
     } catch (error) {
         console.error("❌ Error sending message:", error);
         throw error;
@@ -144,11 +121,12 @@ export async function sendTokenToGroup(tokenAddress: string) {
             throw new Error("Telegram client not initialized");
         }
 
-        const username = process.env.TELEGRAM_USERNAME;
-        if (!username) {
-            throw new Error("TELEGRAM_USERNAME not set in environment variables");
+        if (!process.env.TELEGRAM_GROUP_ID) {
+            throw new Error("TELEGRAM_GROUP_ID not set in environment variables");
         }
 
+        const groupId = process.env.TELEGRAM_GROUP_ID;
+        
         // Format the message with token links
         const message = `🚨 New Token Found! 🚨\n\n` +
             `Token: \`${tokenAddress}\`\n\n` +
@@ -160,10 +138,15 @@ export async function sendTokenToGroup(tokenAddress: string) {
             `• [Raydium](https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${tokenAddress})\n` +
             `• [Jupiter](https://jup.ag/swap/SOL-${tokenAddress})`;
 
-        await sendMessage(username, message);
-        console.log("✅ Token sent to user successfully");
+        await client.sendMessage(groupId, {
+            message,
+            parseMode: 'markdown',
+            linkPreview: false
+        });
+
+        console.log("✅ Token sent to group successfully");
     } catch (error) {
-        console.error("❌ Error sending token to user:", error);
+        console.error("❌ Error sending token to group:", error);
         throw error;
     }
 }

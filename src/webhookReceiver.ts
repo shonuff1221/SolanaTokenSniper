@@ -13,7 +13,7 @@ dotenv.config();
 validateEnv();
 
 const app = express();
-app.use(express.json());
+app.use(express.text());
 
 interface WebhookData {
     Text: string;
@@ -70,6 +70,19 @@ function saveFoundToken(tokenAddress: string, webhookData: WebhookData): void {
     }
 }
 
+// Function to parse webhook body
+function parseWebhookBody(body: string): WebhookData {
+    const textMatch = body.match(/{{Text}}(.*?)(?={{|$)/s);
+    const userNameMatch = body.match(/{{UserName}}(.*?)(?={{|$)/s);
+    const createdAtMatch = body.match(/{{CreatedAt}}(.*?)(?={{|$)/s);
+
+    return {
+        Text: textMatch?.[1]?.trim() || '',
+        UserName: userNameMatch?.[1]?.trim() || '',
+        CreatedAt: createdAtMatch?.[1]?.trim() || new Date().toISOString()
+    };
+}
+
 // Function to extract token addresses from text
 function extractTokenAddresses(text: string): string[] {
     return text.match(config.webhook.token_regex) || [];
@@ -78,7 +91,8 @@ function extractTokenAddresses(text: string): string[] {
 // Webhook endpoint to receive notifications
 app.post(config.webhook.endpoint, async (req, res) => {
     try {
-        const webhookData: WebhookData = req.body;
+        // Parse the webhook body
+        const webhookData = parseWebhookBody(req.body);
         console.log(`📥 Received webhook from @${webhookData.UserName}`);
         console.log(`💬 Tweet: ${webhookData.Text}`);
 
