@@ -1,5 +1,4 @@
 import express from 'express';
-import bodyParser from 'body-parser';
 import { config } from './config';
 import { initTelegram, sendTokenToGroup } from './telegram';
 import { validateEnv } from "./utils/env-validator";
@@ -15,15 +14,8 @@ validateEnv();
 
 const app = express();
 
-// Configure body parser for content types
-app.use((req, res, next) => {
-    const contentType = req.headers['content-type'] || '';
-    if (contentType.includes('application/json')) {
-        bodyParser.json()(req, res, next);
-    } else {
-        bodyParser.text({ type: '*/*' })(req, res, next);
-    }
-});
+// Configure express to accept raw body
+app.use(express.raw({ type: '*/*' }));
 
 interface WebhookData {
     Text: string;
@@ -81,39 +73,12 @@ function saveFoundToken(tokenAddress: string, webhookData: WebhookData): void {
 }
 
 // Function to parse webhook body
-function parseWebhookBody(body: string | WebhookData): WebhookData {
-    console.log('Received body:', body);
-    
+function parseWebhookBody(body: Buffer): WebhookData {
     try {
-        // Try parsing as JSON first if body is a string that looks like JSON
-        if (typeof body === 'string' && body.trim().startsWith('{')) {
-            try {
-                const jsonData = JSON.parse(body) as WebhookData;
-                return {
-                    Text: jsonData.Text || '',
-                    UserName: jsonData.UserName || '',
-                    CreatedAt: jsonData.CreatedAt || new Date().toISOString()
-                };
-            } catch (error) {
-                // Not valid JSON, continue with template parsing
-                return error instanceof Error ? error : JSON.parse(body.toString());
-            }
-        }
+        // Convert buffer to string and parse template tags
+        const bodyStr = body.toString('utf-8');
+        console.log('Parsing webhook body:', bodyStr);
 
-        // If body is already an object
-        if (typeof body === 'object') {
-            const data = body as WebhookData;
-            return {
-                Text: data.Text || '',
-                UserName: data.UserName || '',
-                CreatedAt: data.CreatedAt || new Date().toISOString()
-            };
-        }
-
-        // Parse as text with template tags
-        const bodyStr = body.toString();
-        console.log('Parsing template tags from:', bodyStr);
-        
         const textMatch = bodyStr.match(/{{Text}}(.*?)(?={{|$)/s);
         const userNameMatch = bodyStr.match(/{{UserName}}(.*?)(?={{|$)/s);
         const createdAtMatch = bodyStr.match(/{{CreatedAt}}(.*?)(?={{|$)/s);
@@ -128,7 +93,7 @@ function parseWebhookBody(body: string | WebhookData): WebhookData {
     } catch (error) {
         console.error('Error parsing webhook body:', error);
         return {
-            Text: typeof body === 'string' ? body : JSON.stringify(body),
+            Text: body.toString('utf-8'),
             UserName: 'unknown',
             CreatedAt: new Date().toISOString()
         };
