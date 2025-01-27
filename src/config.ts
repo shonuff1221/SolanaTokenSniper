@@ -110,7 +110,8 @@ export const config = {
       "DesireKeac21062",
       "nicoscalls",      
       "realgmarik",
-      "neim_on_x"
+      "neim_on_x",
+      "chifan735530"
     ],
     blacklisted_users: [      // List of Twitter users whose tokens we don't want to buy
       "kolkerwesl51705",
