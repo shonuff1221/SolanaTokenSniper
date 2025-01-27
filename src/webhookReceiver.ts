@@ -150,23 +150,25 @@ app.post(config.webhook.endpoint, async (req, res) => {
         // If token addresses found, process them
         if (tokenAddresses.length > 0) {
             for (const tokenAddress of tokenAddresses) {
-                console.log(`💎 Found token address: ${tokenAddress}`);
-                
-                // Check if we've seen this token before
+                // Skip if token has been found before
                 if (isTokenFound(tokenAddress)) {
-                    console.log(`⏭️ Token ${tokenAddress} already processed, skipping...`);
+                    console.log(`⏭️ Token ${tokenAddress} has been found before, skipping...`);
                     continue;
                 }
 
-                try {
-                    await sendTokenToGroup(tokenAddress);
-                    console.log(`✅ Sent token ${tokenAddress} to Telegram`);
-                    
-                    // Save the token as processed
-                    saveFoundToken(tokenAddress, webhookData);
-                } catch (error) {
-                    console.error(`❌ Error sending token ${tokenAddress} to Telegram:`, 
-                        error instanceof Error ? error.message : error);
+                console.log(`🔍 Processing token: ${tokenAddress}`);
+                
+                // Save token to found_tokens.json
+                saveFoundToken(tokenAddress, webhookData);
+
+                // Send token to Telegram if enabled
+                if (config.telegram.enabled) {
+                    try {
+                        await sendTokenToGroup(tokenAddress, webhookData.UserName);
+                        console.log(`✅ Sent token ${tokenAddress} to Telegram`);
+                    } catch (error) {
+                        console.error(`❌ Error sending token ${tokenAddress} to Telegram:`, error);
+                    }
                 }
             }
         }

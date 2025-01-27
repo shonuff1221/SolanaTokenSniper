@@ -115,18 +115,12 @@ export async function sendMessage(username: string, message: string) {
     }
 }
 
-export async function sendTokenToGroup(tokenAddress: string) {
+export async function sendTokenToGroup(tokenAddress: string, username?: string) {
     try {
         if (!client) {
             throw new Error("Telegram client not initialized");
         }
 
-        if (!process.env.TELEGRAM_GROUP_ID) {
-            throw new Error("TELEGRAM_GROUP_ID not set in environment variables");
-        }
-
-        const groupId = process.env.TELEGRAM_GROUP_ID;
-        
         // Format the message with token links
         const message = `🚨 New Token Found! 🚨\n\n` +
             `Token: \`${tokenAddress}\`\n\n` +
@@ -138,13 +132,27 @@ export async function sendTokenToGroup(tokenAddress: string) {
             `• [Raydium](https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${tokenAddress})\n` +
             `• [Jupiter](https://jup.ag/swap/SOL-${tokenAddress})`;
 
-        await client.sendMessage(groupId, {
-            message,
-            parseMode: 'markdown',
-            linkPreview: false
-        });
-
-        console.log("✅ Token sent to group successfully");
+        if (username) {
+            // If username is provided, send to that user
+            const peer = await findUserByUsername(username);
+            await client.sendMessage(peer, {
+                message,
+                parseMode: 'markdown',
+                linkPreview: false
+            });
+            console.log(`✅ Token sent to user @${username} successfully`);
+        } else {
+            // Otherwise try to send to group
+            if (!process.env.TELEGRAM_GROUP_ID) {
+                throw new Error("TELEGRAM_GROUP_ID not set in environment variables");
+            }
+            await client.sendMessage(process.env.TELEGRAM_GROUP_ID, {
+                message,
+                parseMode: 'markdown',
+                linkPreview: false
+            });
+            console.log("✅ Token sent to group successfully");
+        }
     } catch (error) {
         console.error("❌ Error sending token to group:", error);
         throw error;
