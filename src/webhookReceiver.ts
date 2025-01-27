@@ -164,7 +164,7 @@ app.post(config.webhook.endpoint, async (req, res) => {
                 // Send token to Telegram if enabled
                 if (config.telegram.enabled) {
                     try {
-                        await sendTokenToGroup(tokenAddress, webhookData.UserName);
+                        await sendTokenToGroup(tokenAddress);
                         console.log(`✅ Sent token ${tokenAddress} to Telegram`);
                     } catch (error) {
                         console.error(`❌ Error sending token ${tokenAddress} to Telegram:`, error);
