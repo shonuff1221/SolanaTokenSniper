@@ -75,25 +75,43 @@ function saveFoundToken(tokenAddress: string, webhookData: WebhookData): void {
 // Function to parse webhook body
 function parseWebhookBody(body: Buffer): WebhookData {
     try {
-        // Convert buffer to string and parse template tags
+        // Convert buffer to string
         const bodyStr = body.toString('utf-8');
         console.log('Parsing webhook body:', bodyStr);
 
-        const textMatch = bodyStr.match(/{{Text}}(.*?)(?={{|$)/s);
-        const userNameMatch = bodyStr.match(/{{UserName}}(.*?)(?={{|$)/s);
-        const createdAtMatch = bodyStr.match(/{{CreatedAt}}(.*?)(?={{|$)/s);
+        // Extract token address
+        const caMatch = bodyStr.match(/CA:\s*([A-Za-z0-9]{32,})/);
+        const token = caMatch ? caMatch[1] : null;
 
-        console.log('Matches:', { textMatch, userNameMatch, createdAtMatch });
+        // Extract username (usually a single word on its own line)
+        const lines = bodyStr.split('\n');
+        const username = lines.find(line => /^[a-zA-Z0-9_]+$/.test(line.trim()))?.trim() || 'unknown';
 
+        // Extract date (usually the last line)
+        const dateLine = lines[lines.length - 1]?.trim() || new Date().toISOString();
+
+        if (token) {
+            console.log('Found token:', token);
+            console.log('Found username:', username);
+            console.log('Found date:', dateLine);
+            
+            return {
+                Text: bodyStr, // Keep full text for token extraction
+                UserName: username,
+                CreatedAt: dateLine
+            };
+        }
+
+        console.log('No token found in message');
         return {
-            Text: textMatch?.[1]?.trim() || '',
-            UserName: userNameMatch?.[1]?.trim() || '',
-            CreatedAt: createdAtMatch?.[1]?.trim() || new Date().toISOString()
+            Text: '',
+            UserName: username,
+            CreatedAt: dateLine
         };
     } catch (error) {
         console.error('Error parsing webhook body:', error);
         return {
-            Text: body.toString('utf-8'),
+            Text: '',
             UserName: 'unknown',
             CreatedAt: new Date().toISOString()
         };
@@ -102,7 +120,19 @@ function parseWebhookBody(body: Buffer): WebhookData {
 
 // Function to extract token addresses from text
 function extractTokenAddresses(text: string): string[] {
-    return text.match(config.webhook.token_regex) || [];
+    // First try to extract from CA: format
+    const caMatch = text.match(/CA:\s*([A-Za-z0-9]{32,})/);
+    if (caMatch && caMatch[1]) {
+        console.log('Extracted token from CA format:', caMatch[1]);
+        return [caMatch[1]];
+    }
+    
+    // Fallback to regex from config
+    const configMatches = text.match(config.webhook.token_regex) || [];
+    if (configMatches.length > 0) {
+        console.log('Extracted tokens from config regex:', configMatches);
+    }
+    return configMatches;
 }
 
 // Webhook endpoint to receive notifications
