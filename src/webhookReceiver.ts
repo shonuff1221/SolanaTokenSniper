@@ -5,6 +5,7 @@ import { validateEnv } from "./utils/env-validator";
 import dotenv from "dotenv";
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 
 // Load environment variables
 dotenv.config();
@@ -31,6 +32,41 @@ interface TokensConfig {
             author: string;
         };
     };
+}
+
+interface RugResponseExtended {
+    token: {
+        mintAuthority: string;
+        freezeAuthority: string;
+        isInitialized: boolean;
+    };
+    tokenMeta: {
+        name: string;
+        symbol: string;
+        mutable: boolean;
+    };
+    detectedAt: string;
+    topHolders: Array<{
+        address: string;
+        amount: number;
+        share: number;
+    }>;
+    markets: Array<{
+        address: string;
+        liquidity: number;
+        lpProviders: number;
+    }>;
+    totalLPProviders: number;
+    totalMarketLiquidity: number;
+    rugged: boolean;
+    score: number;
+    risks?: Array<{
+        name: string;
+        value: string;
+        description: string;
+        score: number;
+        level: string;
+    }>;
 }
 
 // Function to check if token has been found before
@@ -135,6 +171,23 @@ function extractTokenAddresses(text: string): string[] {
     return configMatches;
 }
 
+// Function to get token creation time from rugcheck
+async function getTokenCreationTime(tokenMint: string): Promise<number | null> {
+    try {
+        // Wait briefly for token to be indexed
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const response = await axios.get<RugResponseExtended>(`https://api.rugcheck.xyz/v1/tokens/${tokenMint}/report`);
+        if (response.data && response.data.detectedAt) {
+            return Math.floor(new Date(response.data.detectedAt).getTime() / 1000);
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Error getting token creation time:', error);
+        return null;
+    }
+}
+
 // Webhook endpoint to receive notifications
 app.post(config.webhook.endpoint, async (req, res) => {
     try {
@@ -158,6 +211,20 @@ app.post(config.webhook.endpoint, async (req, res) => {
 
                 console.log(`🔍 Processing token: ${tokenAddress}`);
                 
+                // Check token age
+                const tokenTime = await getTokenCreationTime(tokenAddress);
+                const currentTime = Math.floor(Date.now() / 1000);
+                const maxTokenAgeMinutes = config.twitter_search?.max_token_age_minutes || 40;
+
+                if (tokenTime) {
+                    const ageInMinutes = (currentTime - tokenTime) / 60;
+                    if (ageInMinutes > maxTokenAgeMinutes) {
+                        console.log(`⏰ Token ${tokenAddress} is too old (${Math.round(ageInMinutes)} minutes), skipping...`);
+                        continue;
+                    }
+                    console.log(`✅ Token age: ${Math.round(ageInMinutes)} minutes`);
+                }
+
                 // Save token to found_tokens.json
                 saveFoundToken(tokenAddress, webhookData);
 
