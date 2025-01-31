@@ -122,7 +122,10 @@ export async function sendTokenToGroup(tokenAddress: string) {
         }
 
         // Hardcoded username
-        const targetUsername = "achilles_trojanbot";
+        const targetUsername = "TradeonNova3Bot";  //nova bot
+        //const targetUsername = "TradeonNova3Bot";  //nova bot
+        //const targetUsername = "achilles_trojanbot";  //trojan bot
+        //const targetUsername = "dEdge_solana_bot";  //dEdge bot       
 
         // Format the message with token links
         const message = `🚨 New Token Found! 🚨\n\n` +
