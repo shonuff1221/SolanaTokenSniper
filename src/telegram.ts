@@ -47,11 +47,9 @@ export async function sendTokenToGroup(tokenAddress: string) {
         const message = `🚨 New Alert Found! 🚨\n` +
     `⏰ Time: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}\n\n` +
     `Token Address: <code>${tokenAddress}</code>\n\n` +
-    `🔍 View on Solscan:\n` +
-    `https://solscan.io/token/${tokenAddress}\n\n` +
-    `💱 Trade on Raydium:\n` +
-    `https://raydium.io/swap/?inputCurrency=sol&outputCurrency=${tokenAddress}\n\n` +
-    `🤖 Trade with our Bots:\n` +
+    `💱 View on Bullx_NEO:\n` +
+    `https://neo.bullx.io/terminal?chainId=1399811149&address=${tokenAddress}\n\n` +    
+    `🤖 Trade with Bots:\n` +
     `• Nova Bot - https://t.me/TradeonNovaBot?start=r-shonuff\n` +
     `• Trojan Achilles - https://t.me/achilles_trojanbot?start=r-shonuff1221\n` +
     `• ZelfiGuru - https://t.me/zelfiguru_on_solana_bot?start=NTEyODk3MTc2\n` +
