@@ -1,11 +1,11 @@
-import express from 'express';
+import express, {  Router, RequestHandler } from 'express';
 import { config } from './config';
 import { initTelegram, sendTokenToGroup } from './telegram';
 import { validateEnv } from "./utils/env-validator";
 import dotenv from "dotenv";
 import fs from 'fs';
 import path from 'path';
-import axios from 'axios';
+
 
 // Load environment variables
 dotenv.config();
@@ -14,6 +14,7 @@ dotenv.config();
 validateEnv();
 
 const app = express();
+const router = Router();
 
 // Configure express to accept raw body
 app.use(express.raw({ type: '*/*' }));
@@ -34,40 +35,40 @@ interface TokensConfig {
     };
 }
 
-interface RugResponseExtended {
-    token: {
-        mintAuthority: string;
-        freezeAuthority: string;
-        isInitialized: boolean;
-    };
-    tokenMeta: {
-        name: string;
-        symbol: string;
-        mutable: boolean;
-    };
-    detectedAt: string;
-    topHolders: Array<{
-        address: string;
-        amount: number;
-        share: number;
-    }>;
-    markets: Array<{
-        address: string;
-        liquidity: number;
-        lpProviders: number;
-    }>;
-    totalLPProviders: number;
-    totalMarketLiquidity: number;
-    rugged: boolean;
-    score: number;
-    risks?: Array<{
-        name: string;
-        value: string;
-        description: string;
-        score: number;
-        level: string;
-    }>;
-}
+// interface RugResponseExtended {
+//     token: {
+//         mintAuthority: string;
+//         freezeAuthority: string;
+//         isInitialized: boolean;
+//     };
+//     tokenMeta: {
+//         name: string;
+//         symbol: string;
+//         mutable: boolean;
+//     };
+//     detectedAt: string;
+//     topHolders: Array<{
+//         address: string;
+//         amount: number;
+//         share: number;
+//     }>;
+//     markets: Array<{
+//         address: string;
+//         liquidity: number;
+//         lpProviders: number;
+//     }>;
+//     totalLPProviders: number;
+//     totalMarketLiquidity: number;
+//     rugged: boolean;
+//     score: number;
+//     risks?: Array<{
+//         name: string;
+//         value: string;
+//         description: string;
+//         score: number;
+//         level: string;
+//     }>;
+// }
 
 // Function to check if token has been found before
 function isTokenFound(tokenAddress: string): boolean {
@@ -156,99 +157,57 @@ function parseWebhookBody(body: Buffer): WebhookData {
 
 // Function to extract token addresses from text
 function extractTokenAddresses(text: string): string[] {
-    // First try to extract from CA: format
-    const caMatch = text.match(/CA:\s*([A-Za-z0-9]{32,})/);
-    if (caMatch && caMatch[1]) {
-        console.log('Extracted token from CA format:', caMatch[1]);
-        return [caMatch[1]];
-    }
-    
-    // Fallback to regex from config
-    const configMatches = text.match(config.webhook.token_regex) || [];
-    if (configMatches.length > 0) {
-        console.log('Extracted tokens from config regex:', configMatches);
-    }
-    return configMatches;
-}
-
-// Function to get token creation time from rugcheck
-async function getTokenCreationTime(tokenMint: string): Promise<number | null> {
-    try {
-        // Wait briefly for token to be indexed
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        const response = await axios.get<RugResponseExtended>(`https://api.rugcheck.xyz/v1/tokens/${tokenMint}/report`);
-        if (response.data && response.data.detectedAt) {
-            return Math.floor(new Date(response.data.detectedAt).getTime() / 1000);
-        }
-        return null;
-    } catch (error) {
-        console.error('❌ Error getting token creation time:', error);
-        return null;
-    }
+    const matches = text.match(config.webhook.token_regex) || [];
+    return [...new Set(matches)]; // Remove duplicates
 }
 
 // Webhook endpoint to receive notifications
-app.post(config.webhook.endpoint, async (req, res) => {
+const webhookHandler: RequestHandler = async (req, res) => {
     try {
         console.log('Received request with content-type:', req.headers['content-type']);
-        
-        // Parse the webhook body
         const webhookData = parseWebhookBody(req.body);
-        console.log(`📥 Received webhook data:`, webhookData);
+        console.log('📥 Received webhook data:', webhookData);
 
         // Extract token addresses from the tweet text
         const tokenAddresses = extractTokenAddresses(webhookData.Text);
+        console.log('🔍 Found token addresses:', tokenAddresses);
 
-        // If token addresses found, process them
-        if (tokenAddresses.length > 0) {
-            for (const tokenAddress of tokenAddresses) {
-                // Skip if token has been found before
-                if (isTokenFound(tokenAddress)) {
-                    console.log(`⏭️ Token ${tokenAddress} has been found before, skipping...`);
-                    continue;
-                }
+        if (tokenAddresses.length === 0) {
+            console.log('❌ No token addresses found in tweet');
+            res.status(200).send('No token addresses found');
+            return;
+        }
 
-                console.log(`🔍 Processing token: ${tokenAddress}`);
-                
-                // Check token age
-                const tokenTime = await getTokenCreationTime(tokenAddress);
-                const currentTime = Math.floor(Date.now() / 1000);
-                const maxTokenAgeMinutes = config.twitter_search?.max_token_age_minutes || 40;
+        for (const tokenAddress of tokenAddresses) {
+            // Check if we've already found this token
+            if (isTokenFound(tokenAddress)) {
+                console.log(`⏭️ Token ${tokenAddress} already processed, skipping`);
+                continue;
+            }
 
-                if (tokenTime) {
-                    const ageInMinutes = (currentTime - tokenTime) / 60;
-                    if (ageInMinutes > maxTokenAgeMinutes) {
-                        console.log(`⏰ Token ${tokenAddress} is too old (${Math.round(ageInMinutes)} minutes), skipping...`);
-                        continue;
-                    }
-                    console.log(`✅ Token age: ${Math.round(ageInMinutes)} minutes`);
-                }
-
-                // Save token to found_tokens.json
+            try {
+                // Save the token as found
                 saveFoundToken(tokenAddress, webhookData);
+                console.log(`✅ Saved token ${tokenAddress} as found`);
 
-                // Send token to Telegram if enabled
-                if (config.telegram.enabled) {
-                    try {
-                        await sendTokenToGroup(tokenAddress);
-                        console.log(`✅ Sent token ${tokenAddress} to Telegram`);
-                    } catch (error) {
-                        console.error(`❌ Error sending token ${tokenAddress} to Telegram:`, error);
-                    }
-                }
+                // Send to Telegram with tweet info
+                await sendTokenToGroup(tokenAddress, webhookData.Text, webhookData.UserName);
+                console.log(`✅ Sent token ${tokenAddress} to Telegram`);
+            } catch (error) {
+                console.error(`❌ Error processing token ${tokenAddress}:`, error);
             }
         }
 
-        res.status(200).json({ status: 'success' });
-    } catch (error: unknown) {
+        res.status(200).send('Webhook processed successfully');
+    } catch (error) {
         console.error('❌ Error processing webhook:', error);
-        res.status(500).json({ 
-            status: 'error', 
-            message: error instanceof Error ? error.message : 'Unknown error occurred'
-        });
+        res.status(500).send('Error processing webhook');
     }
-});
+};
+
+router.post(config.webhook.endpoint, webhookHandler);
+
+app.use('/', router);
 
 // Start the server
 async function main() {
