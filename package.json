@@ -18,7 +18,8 @@
     "start:scanner": "node dist/scanTweetWithWebSocket.js",
     "start:webhook": "node dist/webhookReceiver.js",
     "dev:scanner": "ts-node src/scanTweetWithWebSocket.ts",
-    "dev:webhook": "ts-node src/webhookReceiver.ts"
+    "dev:webhook": "ts-node src/webhookReceiver.ts",
+    "pumpfun-scan": "ts-node src/pumpFunScan.ts"
   },
   "keywords": [],
   "author": "https://x.com/shonuff1221",
@@ -42,6 +43,7 @@
     "axios": "^1.7.8",
     "bs58": "^6.0.0",
     "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
     "express": "^4.21.2",
     "input": "^1.0.1",
     "luxon": "^3.5.0",

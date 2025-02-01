@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Top Tokens</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #00ff88;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .token-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #2d2d2d;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .token-table th, .token-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #3d3d3d;
+        }
+        .token-table th {
+            background: #363636;
+            color: #00ff88;
+            font-weight: 600;
+        }
+        .token-table tr:hover {
+            background: #363636;
+        }
+        .price {
+            font-family: monospace;
+            color: #00ff88;
+        }
+        .market-cap {
+            color: #ffd700;
+        }
+        .time {
+            color: #888;
+            font-size: 0.9em;
+        }
+        .auto-refresh {
+            text-align: center;
+            margin-top: 20px;
+            color: #888;
+        }
+    </style>
+    <script>
+        function formatPrice(price) {
+            if (price >= 1) {
+                return price.toFixed(2);
+            } else if (price >= 0.0001) {
+                return price.toFixed(6);
+            } else {
+                return price.toExponential(4);
+            }
+        }
+
+        function formatTimeDiff(dateStr) {
+            const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+            if (diff < 60) return `${diff}s ago`;
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            return `${Math.floor(diff / 3600)}h ago`;
+        }
+
+        async function updateTokens() {
+            try {
+                const response = await fetch('/api/top-tokens');
+                const tokens = await response.json();
+                const tbody = document.querySelector('tbody');
+                tbody.innerHTML = tokens.map((token, index) => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${token.symbol}</td>
+                        <td class="price">$${formatPrice(token.lastPrice || 0)}</td>
+                        <td class="market-cap">${token.marketCapSol.toFixed(2)} SOL</td>
+                        <td class="time">Created: ${formatTimeDiff(token.createdAt)}</td>
+                        <td class="time">Updated: ${token.lastChecked ? formatTimeDiff(token.lastChecked) : 'never'}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error updating tokens:', error);
+            }
+        }
+
+        // Update every second
+        setInterval(updateTokens, 1000);
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>🏆 Top 10 Tokens by Price</h1>
+        <table class="token-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Symbol</th>
+                    <th>Price</th>
+                    <th>Market Cap</th>
+                    <th>Age</th>
+                    <th>Last Update</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% tokens.forEach((token, index) => { %>
+                    <tr>
+                        <td><%= index + 1 %></td>
+                        <td><%= token.symbol %></td>
+                        <td class="price">$<%= token.lastPrice ? token.lastPrice.toFixed(8) : '0.00000000' %></td>
+                        <td class="market-cap"><%= token.marketCapSol.toFixed(2) %> SOL</td>
+                        <td class="time">Created: <%= new Date(token.createdAt).toLocaleString() %></td>
+                        <td class="time">Updated: <%= token.lastChecked ? new Date(token.lastChecked).toLocaleString() : 'never' %></td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+        <div class="auto-refresh">Auto-refreshes every second</div>
+    </div>
+</body>
+</html>
