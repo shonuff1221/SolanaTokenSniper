@@ -37,7 +37,7 @@ export async function sendMessage(chatId: string | number, message: string) {
     }
 }
 
-export async function sendTokenToGroup(tokenAddress: string) {
+export async function sendTokenToGroup(tokenAddress: string, tweetText?: string, author?: string) {
     try {
         const groupId = process.env.TELEGRAM_GROUP_ID;
         if (!groupId) {
@@ -46,6 +46,8 @@ export async function sendTokenToGroup(tokenAddress: string) {
 
         const message = `🚨 New Alert Found! 🚨\n` +
     `⏰ Time: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}\n\n` +
+    `${tweetText ? `📝 Tweet: "${tweetText}"\n` : ''}` +
+    `${author ? `👤 Author: @${author}\n\n` : '\n'}` +
     `Token Address: <code>${tokenAddress}</code>\n\n` +
     `💱 View on Bullx_NEO:\n` +
     `https://neo.bullx.io/terminal?chainId=1399811149&address=${tokenAddress}\n\n` +    
