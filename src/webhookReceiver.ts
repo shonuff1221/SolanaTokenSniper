@@ -116,10 +116,6 @@ function parseWebhookBody(body: Buffer): WebhookData {
         const bodyStr = body.toString('utf-8');
         console.log('Parsing webhook body:', bodyStr);
 
-        // Extract token address
-        const caMatch = bodyStr.match(/CA:\s*([A-Za-z0-9]{32,})/);
-        const token = caMatch ? caMatch[1] : null;
-
         // Extract username (usually a single word on its own line)
         const lines = bodyStr.split('\n');
         const username = lines.find(line => /^[a-zA-Z0-9_]+$/.test(line.trim()))?.trim() || 'unknown';
@@ -127,21 +123,9 @@ function parseWebhookBody(body: Buffer): WebhookData {
         // Extract date (usually the last line)
         const dateLine = lines[lines.length - 1]?.trim() || new Date().toISOString();
 
-        if (token) {
-            console.log('Found token:', token);
-            console.log('Found username:', username);
-            console.log('Found date:', dateLine);
-            
-            return {
-                Text: bodyStr, // Keep full text for token extraction
-                UserName: username,
-                CreatedAt: dateLine
-            };
-        }
-
-        console.log('No token found in message');
+        // Always return the full text for token extraction
         return {
-            Text: '',
+            Text: bodyStr,
             UserName: username,
             CreatedAt: dateLine
         };
