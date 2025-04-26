@@ -1,0 +1,34 @@
+{
+  "tokenAddress": "4iH5tVywTdWYZaNwfU6ap3sPKNMtfJqgQ5UmLWAMpump",
+  "searchTime": "2025-01-27T09:52:50.263Z",
+  "timeWindow": "30 minutes",
+  "tweetCount": 4,
+  "uniqueAuthors": [
+    "yutibot",
+    "0xmoneymaxi",
+    "noisestart",
+    "snipegurusolvol"
+  ],
+  "tweets": [
+    {
+      "text": "Yuti Bot@YutiBot·12sNew Pump Fun token graduated! \n\n deepfriedunicornfartseek6900 ( $DUFS6900 )\n 4iH5tVywTdWYZaNwfU6ap3sPKNMtfJqgQ5UmLWAMpump\n\n 999.9 M (0.00% )\n 362\n: 25%\n 2BGoeDzpYWKJwazgzTy5dFxnVKDT2QSNXXRyP52niE7o & 0.00%\n 0 days, 1 hours, and 9 minutesShow more",
+      "timestamp": "2025-01-27T09:52:36.000Z",
+      "author": "YutiBot"
+    },
+    {
+      "text": "moneymaka @0xmoneymaxi·59s#deepfriedunicornfartseek6900\n\n4iH5tVywTdWYZaNwfU6ap3sPKNMtfJqgQ5UmLWAMpumpGIF2",
+      "timestamp": "2025-01-27T09:51:49.000Z",
+      "author": "0xmoneymaxi"
+    },
+    {
+      "text": "Yuki~@noisestart·3mGood entry at $60k+ almost at Ray, DEX paid\n\n4iH5tVywTdWYZaNwfU6ap3sPKNMtfJqgQ5UmLWAMpump134",
+      "timestamp": "2025-01-27T09:49:04.000Z",
+      "author": "noisestart"
+    },
+    {
+      "text": "Solana Memecoins Signal | Snipe.guru@snipegurusolvol·25mAutomateddeepfriedunicornfartseek6900 | $DUFS6900 | #DUFS6900 \nPump progress: ▓▓▓▓▓▓▓▓ 85% | \n Open:  42m\nCA: 4iH5tVywTdWYZaNwfU6ap3sPKNMtfJqgQ5UmLWAMpump\n Volume:   83,934.35$\n MKT CAP:    46,095.82$\n Txns Buy:  967 |  Txns Sell: 891\nTop 10 holders hold:  25.6705%\nTotalShow more230",
+      "timestamp": "2025-01-27T09:26:50.000Z",
+      "author": "snipegurusolvol"
+    }
+  ]
+}

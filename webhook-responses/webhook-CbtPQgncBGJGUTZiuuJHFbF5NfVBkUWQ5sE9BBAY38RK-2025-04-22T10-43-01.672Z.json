@@ -1,0 +1,11 @@
+{
+  "success": true,
+  "tokenMint": "CbtPQgncBGJGUTZiuuJHFbF5NfVBkUWQ5sE9BBAY38RK",
+  "timestamp": "2025-04-22T10:43:01.673Z",
+  "statusCode": 200,
+  "statusText": "OK",
+  "data": {
+    "message": "Workflow was started"
+  },
+  "tokenScore": 0
+}

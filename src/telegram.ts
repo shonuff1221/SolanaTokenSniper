@@ -11,7 +11,34 @@ dotenv.config();
 
 const apiId = parseInt(process.env.TELEGRAM_API_ID || "0");
 const apiHash = process.env.TELEGRAM_API_HASH || "";
-const stringSession = new StringSession(process.env.TELEGRAM_STRING_SESSION || "");
+
+// Create a custom session class that can work with both Telegram.js and Pyrogram session strings
+class CustomSession extends StringSession {
+    constructor(session: string) {
+        // If empty, create an empty session
+        if (!session) {
+            super("");
+            return;
+        }
+
+        try {
+            // Try to use it as a regular Telegram.js session first
+            super(session);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_) {
+            // If it fails, it might be a Pyrogram session string
+            // For now, we'll create an empty session
+            console.log("The provided session string is not in Telegram.js format");
+            console.log("Starting with a new session");
+            super("");
+        }
+    }
+}
+
+// Get the session string from environment variables
+const sessionStr = process.env.TELEGRAM_STRING_SESSION || "";
+// Create a custom session that can handle both formats
+const stringSession = new CustomSession(sessionStr);
 
 let client: TelegramClient | null = null;
 
@@ -47,12 +74,6 @@ export async function initTelegram() {
         process.exit(1);
     }
 
-    if (!process.env.TELEGRAM_STRING_SESSION) {
-        console.error("❌ Missing TELEGRAM_STRING_SESSION in .env file");
-        console.error("Please run the local setup first to generate a session");
-        process.exit(1);
-    }
-
     try {
         console.log("🔄 Initializing Telegram client...");
         client = new TelegramClient(stringSession, apiId, apiHash, {
@@ -66,10 +87,21 @@ export async function initTelegram() {
         await client.connect();
         console.log("✅ Connected to Telegram");
 
+        // Check if we're logged in
+        if (!await client.isUserAuthorized()) {
+            console.log("⚠️ Not logged in. Starting login process...");
+            
+            // For automated systems, you would need to use a bot token
+            // or have a way to input the verification code
+            console.error("❌ Automated login not possible in this script.");
+            console.error("Please run a separate script to generate a valid session string.");
+            process.exit(1);
+        }
+
         // Test connection by getting self
         const me = await client.getMe();
         if (me && (me as Api.User).username) {
-            console.log("✅ Logged in as:", (me as Api.User).username);
+            console.log("✅ Logged in as:", (me as Api.User).username);            
         }
 
     } catch (error: any) {

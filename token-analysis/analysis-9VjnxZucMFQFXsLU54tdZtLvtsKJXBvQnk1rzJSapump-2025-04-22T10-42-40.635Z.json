@@ -1,0 +1,55 @@
+{
+  "tokenAddress": "9VjnxZucMFQFXsLU54tdZtLvtsKJXBvQnk1rzJSapump",
+  "name": "Unknown",
+  "symbol": "Unknown",
+  "score": 0,
+  "buyVsSellRatio": 0,
+  "hasSocials": false,
+  "hasWebsite": false,
+  "verified": false,
+  "pairCount": 0,
+  "buyCount": 0,
+  "sellCount": 0,
+  "recentOrders": [],
+  "pairs": [],
+  "tokenInfo": {},
+  "scoreBreakdown": [
+    {
+      "category": "Liquidity",
+      "score": 0,
+      "maxScore": 25,
+      "details": "No liquidity data"
+    },
+    {
+      "category": "Buy/Sell Ratio",
+      "score": 0,
+      "maxScore": 20,
+      "details": "0 buys vs 0 sells (ratio: 0.00)"
+    },
+    {
+      "category": "24h Volume",
+      "score": 0,
+      "maxScore": 15,
+      "details": "No volume data"
+    },
+    {
+      "category": "Social Presence",
+      "score": 0,
+      "maxScore": 15,
+      "details": "Website: No, Twitter: No, Telegram: No, Discord: No, Verified: No"
+    },
+    {
+      "category": "Trading Pairs",
+      "score": 0,
+      "maxScore": 10,
+      "details": "0 trading pairs"
+    },
+    {
+      "category": "Market Cap",
+      "score": 0,
+      "maxScore": 15,
+      "details": "No market cap data"
+    }
+  ],
+  "links": {}
+}
