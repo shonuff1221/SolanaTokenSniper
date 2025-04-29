@@ -36,6 +36,55 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 5. To start the tracker, run: "npm run tracker"
 6. Optional: To start the sniper and tracker after being compiled, run: "npm run start" and "npm run start:tracker"
 
+### Running in Production with PM2
+
+For production environments, it's recommended to use PM2 (Process Manager) to keep your services running continuously:
+
+1. **Install PM2 globally**:
+   ```bash
+   npm install -g pm2
+   ```
+
+2. **Build the TypeScript files**:
+   ```bash
+   npm run build:all
+   ```
+
+3. **Start services using PM2**:
+   ```bash
+   pm2 start ecosystem.config.js
+   ```
+
+4. **View running processes**:
+   ```bash
+   pm2 status
+   ```
+
+5. **View logs**:
+   ```bash
+   pm2 logs                # View all logs
+   pm2 logs n8nAi          # View n8nAi logs
+   pm2 logs webhookReceiver # View webhook logs
+   ```
+
+6. **Restart services**:
+   ```bash
+   pm2 restart all         # Restart all services
+   pm2 restart n8nAi       # Restart specific service
+   ```
+
+7. **Set PM2 to start on system boot**:
+   ```bash
+   pm2 startup
+   pm2 save
+   ```
+
+8. **Stop services**:
+   ```bash
+   pm2 stop all            # Stop all services
+   pm2 stop n8nAi          # Stop specific service
+   ```
+
 ### Update Log
 
 - 10-jan-2025:21: Added Dexscreener Tokens API as price source for tracker with option in config.

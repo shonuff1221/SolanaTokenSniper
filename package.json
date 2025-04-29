@@ -5,8 +5,11 @@
   "scripts": {
     "build": "tsc",
     "build:webhook": "tsc -p tsconfig.webhook.json",
+    "build:n8nai": "tsc -p tsconfig.n8nai.json",
+    "build:all": "npm run build && npm run build:webhook && npm run build:n8nai",
     "start": "node dist/index.js",
     "start:tracker": "node dist/tracker/index.js",
+    "start:n8nai": "node dist/n8nAi.js",
     "dev": "ts-node src/index.ts",
     "tracker": "ts-node src/tracker/index.ts",
     "test": "ts-node src/test.ts",
@@ -18,7 +21,8 @@
     "start:scanner": "node dist/scanTweetWithWebSocket.js",
     "start:webhook": "node dist/webhookReceiver.js",
     "dev:scanner": "ts-node src/scanTweetWithWebSocket.ts",
-    "dev:webhook": "ts-node src/webhookReceiver.ts"
+    "dev:webhook": "ts-node src/webhookReceiver.ts",
+    "dev:n8nai": "ts-node src/n8nAi.ts"
   },
   "keywords": [],
   "author": "https://x.com/shonuff1221",

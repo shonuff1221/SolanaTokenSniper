@@ -1,7 +1,7 @@
 export const config = {
   webhook: {
     enabled: true,
-    port: 3000,
+    port: 3040,
     endpoint: '/webhook',
     token_regex: /[1-9A-HJ-NP-Za-km-z]{32,44}/g,  // Regex for finding Solana token addresses
   },

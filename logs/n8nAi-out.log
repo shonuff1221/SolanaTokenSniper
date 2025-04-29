@@ -1,0 +1,23 @@
+2025-04-29 13:15:07: 🔄 Initializing Telegram client...
+2025-04-29 13:15:07: [33m[2025-04-29T13:15:07.486] [INFO] - [Running gramJS version 2.26.15][0m
+2025-04-29 13:15:07: 🔄 Initializing Telegram client...
+2025-04-29 13:15:07: [33m[2025-04-29T13:15:07.487] [INFO] - [Running gramJS version 2.26.15][0m
+2025-04-29 13:15:07: [33m[2025-04-29T13:15:07.490] [INFO] - [Connecting to 149.154.175.56:443/TCPFull...][0m
+2025-04-29 13:15:07: [33m[2025-04-29T13:15:07.492] [INFO] - [Connecting to 149.154.175.56:443/TCPFull...][0m
+2025-04-29 13:15:07: [33m[2025-04-29T13:15:07.517] [INFO] - [Connection to 149.154.175.56:443/TCPFull complete!][0m
+2025-04-29 13:15:07: [33m[2025-04-29T13:15:07.518] [INFO] - [Using LAYER 193 for initial connect][0m
+2025-04-29 13:15:07: [33m[2025-04-29T13:15:07.523] [INFO] - [Connection to 149.154.175.56:443/TCPFull complete!][0m
+2025-04-29 13:15:07: [33m[2025-04-29T13:15:07.523] [INFO] - [Using LAYER 193 for initial connect][0m
+2025-04-29 13:15:07: ✅ Connected to Telegram
+2025-04-29 13:15:07: ✅ Connected to Telegram
+2025-04-29 13:15:07: ✅ Logged in as: Shonuff1221
+2025-04-29 13:15:07: ✅ Webhook URL configured: https://n8n.app.ejm.services/webhook/5bcdcc39-5f02-43c0-8690-1eac3756044a
+2025-04-29 13:15:07: 🔄 Connecting to PumpPortal API...
+2025-04-29 13:15:07: ✅ Logged in as: Shonuff1221
+2025-04-29 13:15:07: ✅ Connected to PumpPortal API
+2025-04-29 13:15:07: ✅ Subscribed to migration events
+2025-04-29 13:15:07: ✅ PumpPortal: Subscribed to 'migration' events.
+2025-04-29 13:15:07: 📡 Sending subscription request...
+2025-04-29 13:15:07: 
+🔓 WebSocket is open and listening.
+2025-04-29 13:15:07: ✅ Subscription confirmed
